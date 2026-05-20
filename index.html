@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport configured for touch apps: disables double-tap zoom for high responsiveness -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>PDFiller Mobile - Rellenador y Firmador PWA</title>
+  
+  <!-- SEO & PWA Meta Tags -->
+  <meta name="description" content="Rellena y firma PDFs en tu móvil usando tu dedo o S Pen de forma local, segura y rápida.">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+
+  <!-- Google Fonts: Outfit, Inter & Quicksand -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Quicksand:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Mobile Specific CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Wrapper -->
+  <div id="app-container" class="app-layout">
+    
+    <!-- Top Action Bar (Header) -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <i class="fa-solid fa-file-signature text-gradient"></i>
+        </div>
+        <h1>PDF<span class="gradient-text">iller</span> <span class="mobile-badge">Mobile</span></h1>
+      </div>
+      <div class="header-actions">
+        <!-- Quick Action: Export / Download -->
+        <button id="btn-save-final-quick" class="btn-circle btn-primary" title="Exportar y descargar PDF">
+          <i class="fa-solid fa-download"></i>
+        </button>
+      </div>
+    </header>
+    
+    <!-- Editor Canvas Area -->
+    <main class="editor-area">
+      <!-- Drag and Drop Overlay / Loading Mobile Welcome -->
+      <div id="drop-zone" class="drop-zone active">
+        <div class="drop-zone-content">
+          <div class="upload-icon-wrapper">
+            <i class="fa-solid fa-file-pdf upload-icon animate-bounce"></i>
+          </div>
+          <h2>Rellena y firma PDFs en tu móvil</h2>
+          <p>Selecciona tu archivo PDF local para comenzar</p>
+          <button id="btn-browse-file" class="btn btn-accent btn-lg btn-full">
+            <i class="fa-solid fa-folder-open"></i> <span>Abrir PDF</span>
+          </button>
+          <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+        </div>
+      </div>
+      
+      <!-- Viewer Viewport -->
+      <div id="viewer-container" class="viewer-container hidden">
+        <!-- Dynamic pages render here -->
+      </div>
+    </main>
+
+    <!-- Bottom Navigation Bar (App-Style) -->
+    <nav class="bottom-nav">
+      <button id="nav-btn-doc" class="nav-item" data-drawer="drawer-doc">
+        <i class="fa-solid fa-file-pdf"></i>
+        <span>Documento</span>
+      </button>
+      <button id="nav-btn-text" class="nav-item" data-drawer="drawer-text">
+        <i class="fa-solid fa-font"></i>
+        <span>Texto</span>
+      </button>
+      <button id="nav-btn-signature" class="nav-item" data-drawer="drawer-sig">
+        <i class="fa-solid fa-pen-nib"></i>
+        <span>Firmar</span>
+      </button>
+      <button id="nav-btn-corrector" class="nav-item" data-drawer="drawer-corr">
+        <i class="fa-solid fa-eraser"></i>
+        <span>Corrector</span>
+      </button>
+    </nav>
+
+    <!-- Bottom Sliding Drawers (Configuration Panels) -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+
+    <!-- Drawer: Document Settings -->
+    <div class="bottom-drawer" id="drawer-doc">
+      <div class="drawer-header">
+        <div class="drawer-handle"></div>
+        <h3>Gestión de Documento</h3>
+        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="document-info">
+          <div class="info-row">
+            <span class="info-label">Archivo:</span>
+            <span class="info-value" id="doc-filename">- Ninguno -</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Páginas:</span>
+            <span class="info-value" id="doc-page-count">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Elementos:</span>
+            <span class="info-value" id="doc-element-count">0</span>
+          </div>
+        </div>
+        <div class="action-grid-full">
+          <button id="btn-load-new" class="btn btn-secondary btn-full">
+            <i class="fa-solid fa-folder-open text-primary"></i> <span>Abrir otro PDF</span>
+          </button>
+          <button id="btn-save-current" class="btn btn-secondary btn-full">
+            <i class="fa-solid fa-floppy-disk text-primary"></i> <span>Guardar en navegador</span>
+          </button>
+          <button id="btn-save-as" class="btn btn-secondary btn-full">
+            <i class="fa-solid fa-file-export text-primary"></i> <span>Guardar como...</span>
+          </button>
+          <button id="btn-save-final" class="btn btn-primary btn-full">
+            <i class="fa-solid fa-download"></i> <span>Exportar y Descargar</span>
+          </button>
+        </div>
+        <div class="sidebar-action-grid" style="margin-top: 15px;">
+          <button id="btn-undo" class="btn btn-secondary btn-sm" disabled>
+            <i class="fa-solid fa-undo"></i> Deshacer
+          </button>
+          <button id="btn-redo" class="btn btn-secondary btn-sm" disabled>
+            <i class="fa-solid fa-redo"></i> Rehacer
+          </button>
+        </div>
+        <button id="btn-clear-all" class="btn btn-danger btn-sm btn-full" style="margin-top: 10px;" disabled>
+          <i class="fa-solid fa-trash-can"></i> Limpiar todo el PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawer: Text settings -->
+    <div class="bottom-drawer" id="drawer-text">
+      <div class="drawer-header">
+        <div class="drawer-handle"></div>
+        <h3>Propiedades de Texto</h3>
+        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="tool-info-bar">
+          <p><i class="fa-solid fa-circle-info text-accent"></i> Toca cualquier parte del PDF para agregar texto.</p>
+        </div>
+        <!-- Font Selection -->
+        <div class="control-group">
+          <label><i class="fa-solid fa-font"></i> Tipografía</label>
+          <div class="select-wrapper">
+            <select id="font-family-select">
+              <option value="Calibri" style="font-family: Calibri, sans-serif;">Calibri</option>
+              <option value="Verdana" style="font-family: Verdana, sans-serif;">Verdana</option>
+              <option value="Arial" style="font-family: Arial, sans-serif;">Arial</option>
+              <option value="Helvetica" style="font-family: Helvetica, Arial, sans-serif;">Helvetica</option>
+              <option value="Times New Roman" style="font-family: 'Times New Roman', serif;">Times New Roman</option>
+              <option value="Courier New" style="font-family: 'Courier New', monospace;">Courier New</option>
+              <option value="Quicksand" style="font-family: 'Quicksand', sans-serif;">Quicksand</option>
+            </select>
+            <i class="fa-solid fa-chevron-down select-arrow"></i>
+          </div>
+        </div>
+        <!-- Font Size -->
+        <div class="control-group" style="margin-top: 12px;">
+          <label><i class="fa-solid fa-text-height"></i> Tamaño (<span id="font-size-val">14</span>px)</label>
+          <input type="range" id="font-size-range" min="8" max="40" value="14">
+          <div class="size-presets">
+            <button class="preset-btn" data-size="10">Pq</button>
+            <button class="preset-btn active" data-size="14">Md</button>
+            <button class="preset-btn" data-size="20">Gd</button>
+            <button class="preset-btn" data-size="28">Xl</button>
+          </div>
+        </div>
+        <!-- Font Color -->
+        <div class="control-group" style="margin-top: 12px;">
+          <label><i class="fa-solid fa-palette"></i> Color de letra</label>
+          <div class="color-palette">
+            <button class="color-swatch active" data-color="#000000" style="background-color: #000000;"></button>
+            <button class="color-swatch" data-color="#1e3a8a" style="background-color: #1e3a8a;"></button>
+            <button class="color-swatch" data-color="#b91c1c" style="background-color: #b91c1c;"></button>
+            <button class="color-swatch" data-color="#047857" style="background-color: #047857;"></button>
+            <button class="color-swatch" data-color="#4b5563" style="background-color: #4b5563;"></button>
+            <div class="custom-color-wrapper">
+              <input type="color" id="custom-color-picker" value="#000000">
+              <i class="fa-solid fa-eye-dropper custom-color-icon"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawer: Signature Gallery & Creator -->
+    <div class="bottom-drawer" id="drawer-sig">
+      <div class="drawer-header">
+        <div class="drawer-handle"></div>
+        <h3>Galería de Firmas</h3>
+        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="tool-info-bar">
+          <p><i class="fa-solid fa-circle-info text-accent"></i> Selecciona una firma de abajo y pulsa en el PDF para colocarla.</p>
+        </div>
+        <button id="btn-create-sig" class="btn btn-accent btn-full" style="margin-bottom: 12px;">
+          <i class="fa-solid fa-signature"></i> <span>Crear Nueva Firma / S Pen</span>
+        </button>
+        <!-- Signature list -->
+        <div class="signature-library-wrapper">
+          <p class="library-empty" id="sig-library-empty">No hay firmas creadas aún. Haz clic arriba para crear una.</p>
+          <div class="signature-grid" id="signature-grid-list">
+            <!-- Dynamic items -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawer: Corrector Intelligent Settings -->
+    <div class="bottom-drawer" id="drawer-corr">
+      <div class="drawer-header">
+        <div class="drawer-handle"></div>
+        <h3>Herramienta Corrector</h3>
+        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="tool-info-bar">
+          <p><i class="fa-solid fa-eraser text-primary"></i> **Borrador inteligente**: Arrastra tu dedo o lápiz sobre cualquier área del PDF. Detectará automáticamente el color del fondo y la cubrirá con un parche corrector perfecto.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Session Restore Toast -->
+  <div id="restore-toast" class="toast hidden">
+    <div class="toast-content">
+      <i class="fa-solid fa-clock-rotate-left toast-icon"></i>
+      <div class="toast-body">
+        <h4>Progreso guardado encontrado</h4>
+        <p>¿Quieres recuperar tu última edición en el documento <strong id="restore-filename"></strong>?</p>
+      </div>
+      <div class="toast-actions">
+        <button id="btn-restore-cancel" class="btn btn-sm btn-secondary">Descartar</button>
+        <button id="btn-restore-confirm" class="btn btn-sm btn-accent">Restaurar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Creator Modal (Stylus / S Pen Optimized) -->
+  <div id="sig-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Crear Firma con Precisión</h3>
+        <button class="modal-close" id="btn-close-sig-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-tabs">
+        <button class="tab-btn active" data-tab="tab-draw">
+          <i class="fa-solid fa-pen-fancy"></i> Dibujar / S Pen
+        </button>
+        <button class="tab-btn" data-tab="tab-upload">
+          <i class="fa-solid fa-image"></i> Importar Firma
+        </button>
+      </div>
+      
+      <!-- Tab 1: Draw Signature with Stylus Pressure Sensitivity -->
+      <div id="tab-draw" class="tab-content active">
+        <div class="draw-controls">
+          <div class="brush-settings">
+            <span class="control-label">Color:</span>
+            <div class="brush-colors">
+              <button class="brush-color active" data-color="#000000" style="background-color: #000000;"></button>
+              <button class="brush-color" data-color="#1e3a8a" style="background-color: #1e3a8a;"></button>
+              <button class="brush-color" data-color="#b91c1c" style="background-color: #b91c1c;"></button>
+            </div>
+            <span class="control-label gap-left">Grosor Base:</span>
+            <input type="range" id="brush-thickness" min="2" max="6" value="3">
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-clear-sig-pad">
+            <i class="fa-solid fa-eraser"></i> Borrar lienzo
+          </button>
+        </div>
+        
+        <!-- S Pen / Precision Drawing area -->
+        <div class="signature-pad-container">
+          <!-- Canvas sized relative to viewport -->
+          <canvas id="signature-pad" width="340" height="240"></canvas>
+        </div>
+        <div class="stylus-info-tip">
+          <p><i class="fa-solid fa-pen-nib"></i> **Optimizado para S Pen**: Ejerce más o menos presión para variar de forma dinámica el grosor del trazo.</p>
+        </div>
+      </div>
+      
+      <!-- Tab 2: Upload Image Signature -->
+      <div id="tab-upload" class="tab-content">
+        <div class="image-upload-zone" id="img-sig-dropzone">
+          <div class="upload-zone-prompt" id="img-sig-prompt">
+            <i class="fa-solid fa-images upload-img-icon"></i>
+            <p>Arrastra tu firma PNG/JPG o haz clic para subir</p>
+            <button class="btn btn-secondary btn-sm" id="btn-browse-img-sig">Examinar</button>
+            <input type="file" id="img-sig-input" accept="image/png, image/jpeg, image/jpg" style="display: none;">
+          </div>
+          <div class="image-preview-container hidden" id="img-sig-preview-wrapper">
+            <img id="img-sig-preview" src="" alt="Firma importada">
+            <button class="btn-remove-preview" id="btn-remove-img-sig" title="Quitar imagen"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+        
+        <div class="signature-options">
+          <label class="checkbox-container">
+            <input type="checkbox" id="chk-remove-bg" checked>
+            <span class="checkmark"></span>
+            Eliminar fondo blanco (Hacer transparente)
+          </label>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-sig">Cancelar</button>
+        <button class="btn btn-accent" id="btn-save-sig" disabled>Guardar Firma</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- "Guardar Como" File Name Modal -->
+  <div id="save-as-modal" class="modal-overlay hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>Guardar PDF Como</h3>
+        <button class="modal-close" id="btn-close-save-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="control-group">
+          <label for="save-filename-input">Nombre del Archivo</label>
+          <div class="input-with-addon">
+            <input type="text" id="save-filename-input" placeholder="nombre-del-archivo">
+            <span class="input-addon">.pdf</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-save">Cancelar</button>
+        <button class="btn btn-primary" id="btn-confirm-save">Exportar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="modal-overlay hidden bg-dark-opaque">
+    <div class="spinner-container">
+      <div class="spinner"></div>
+      <p id="loading-text">Cargando PDF...</p>
+    </div>
+  </div>
+
+  <!-- PDF.js CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+
+  <!-- PDF-lib and Fontkit CDN Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.0/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+
+  <!-- Service Worker PWA Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registrado correctamente.', reg.scope))
+          .catch(err => console.warn('Fallo en el registro del Service Worker.', err));
+      });
+    }
+  </script>
+
+  <!-- Main JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

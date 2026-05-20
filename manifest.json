@@ -1,0 +1,18 @@
+{
+  "name": "PDFiller Mobile - Rellenador y Firmador Premium",
+  "short_name": "PDFiller",
+  "description": "Edita, rellena y firma tus documentos PDF de forma local, rápida y segura en tu dispositivo móvil.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
