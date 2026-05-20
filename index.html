@@ -36,7 +36,7 @@
         <div class="logo-icon">
           <i class="fa-solid fa-file-signature text-gradient"></i>
         </div>
-        <h1>PDF<span class="gradient-text">iller</span> <span class="mobile-badge">Mobile</span></h1>
+        <h1><span class="brand-name">PDF<span class="gradient-text">iller</span></span> <span class="mobile-badge">Mobile</span></h1>
       </div>
       <div class="header-actions">
         <!-- Quick Action: Export / Download -->
@@ -65,7 +65,9 @@
       
       <!-- Viewer Viewport -->
       <div id="viewer-container" class="viewer-container hidden">
-        <!-- Dynamic pages render here -->
+        <div id="zoom-content-wrapper" class="zoom-content-wrapper">
+          <!-- Dynamic pages render here -->
+        </div>
       </div>
     </main>
 
@@ -138,6 +140,9 @@
         </div>
         <button id="btn-clear-all" class="btn btn-danger btn-sm btn-full" style="margin-top: 10px;" disabled>
           <i class="fa-solid fa-trash-can"></i> Limpiar todo el PDF
+        </button>
+        <button id="btn-clear-user-data" class="btn btn-danger btn-sm btn-full" style="margin-top: 10px;">
+          <i class="fa-solid fa-user-slash"></i> Cerrar sesión y limpiar datos locales
         </button>
       </div>
     </div>
@@ -379,6 +384,11 @@
       });
     }
   </script>
+
+  <!-- Floating Precision Magnifier -->
+  <div id="magnifier" class="magnifier hidden">
+    <canvas id="magnifier-canvas" width="140" height="140"></canvas>
+  </div>
 
   <!-- Main JavaScript -->
   <script src="app.js"></script>

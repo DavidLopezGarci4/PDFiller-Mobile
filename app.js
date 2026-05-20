@@ -9,6 +9,7 @@
  */
 
 // Application State
+// Application State
 const state = {
   pdfDocument: null,
   pdfBytes: null,
@@ -34,7 +35,12 @@ const state = {
   historyIndex: -1,
   
   // Drag / Resize / Touch state
-  lastFocusedTextValue: ''
+  lastFocusedTextValue: '',
+
+  // Multi-Touch Gesture Zoom & Pan State
+  zoom: 1.0,
+  panX: 0,
+  panY: 0
 };
 
 // DOM Cache
@@ -42,6 +48,7 @@ const dom = {
   // Shell & Layout
   appContainer: document.getElementById('app-container'),
   viewerContainer: document.getElementById('viewer-container'),
+  zoomContentWrapper: document.getElementById('zoom-content-wrapper'),
   dropZone: document.getElementById('drop-zone'),
   fileInput: document.getElementById('file-input'),
   btnBrowseFile: document.getElementById('btn-browse-file'),
@@ -67,6 +74,7 @@ const dom = {
   btnSaveCurrent: document.getElementById('btn-save-current'),
   btnSaveAs: document.getElementById('btn-save-as'),
   btnSaveFinal: document.getElementById('btn-save-final'),
+  btnClearUserData: document.getElementById('btn-clear-user-data'),
 
   // Drawer: Text Settings
   fontFamilySelect: document.getElementById('font-family-select'),
@@ -107,7 +115,11 @@ const dom = {
   btnCloseSaveModal: document.getElementById('btn-close-save-modal'),
   saveFilenameInput: document.getElementById('save-filename-input'),
   btnCancelSave: document.getElementById('btn-cancel-save'),
-  btnConfirmSave: document.getElementById('btn-confirm-save')
+  btnConfirmSave: document.getElementById('btn-confirm-save'),
+
+  // Floating Magnifier Elements
+  magnifier: document.getElementById('magnifier'),
+  magnifierCanvas: document.getElementById('magnifier-canvas')
 };
 
 // -------------------------------------------------------------
@@ -306,6 +318,14 @@ function initEventListeners() {
   dom.btnCloseSaveModal.addEventListener('click', closeSaveAsModal);
   dom.btnCancelSave.addEventListener('click', closeSaveAsModal);
   dom.btnConfirmSave.addEventListener('click', saveAsFinalPdf);
+
+  // Privacy: Clear all data
+  if (dom.btnClearUserData) {
+    dom.btnClearUserData.addEventListener('click', clearUserDataAndReset);
+  }
+
+  // Multi-touch gestures
+  initTouchGestures();
 }
 
 function switchTool(toolType) {
@@ -393,7 +413,14 @@ function loadSelectedFile(file) {
 
 async function renderPdf() {
   showLoading('Renderizando páginas del PDF...');
-  dom.viewerContainer.innerHTML = '';
+  
+  // Reset zoom and pan on new PDF load
+  state.zoom = 1.0;
+  state.panX = 0;
+  state.panY = 0;
+  updateZoomTransform();
+  
+  dom.zoomContentWrapper.innerHTML = '';
   state.pages = [];
   
   try {
@@ -462,7 +489,7 @@ async function renderPdf() {
       });
       
       pageContainer.appendChild(overlay);
-      dom.viewerContainer.appendChild(pageContainer);
+      dom.zoomContentWrapper.appendChild(pageContainer);
       
       await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
       
@@ -543,6 +570,7 @@ function addTextAnnotation(pageNum, xPercent, yPercent, text = 'Texto...', custo
     page: pageNum,
     xPercent: adjustedX,
     yPercent: adjustedY,
+    widthPercent: settings.widthPercent || 0.35, // Default 35% page width for horizontal resizing
     text: text,
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
@@ -619,6 +647,7 @@ function createTextDomElement(anno) {
   el.spellcheck = false;
   el.style.left = (anno.xPercent * 100) + '%';
   el.style.top = (anno.yPercent * 100) + '%';
+  el.style.width = anno.widthPercent ? (anno.widthPercent * 100) + '%' : 'auto';
   
   let cssFont = anno.fontFamily + ', sans-serif';
   if (anno.fontFamily === 'Times New Roman') cssFont = "'Times New Roman', Times, serif";
@@ -649,6 +678,12 @@ function createTextDomElement(anno) {
     deleteAnnotation(anno.id);
   });
   el.appendChild(delBtn);
+  
+  // Drag Resize corner handle
+  const handle = document.createElement('div');
+  handle.className = 'text-resize-handle';
+  el.appendChild(handle);
+  makeHorizontalResizable(el, handle, anno.id);
   
   // Input tracking
   el.addEventListener('focus', () => {
@@ -804,6 +839,8 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
   tempBox.style.height = '0%';
   overlay.appendChild(tempBox);
   
+  updateMagnifier(clientX, clientY, pageNum);
+  
   function moveHandler(ev) {
     const coords = ev.touches && ev.touches.length > 0 ? ev.touches[0] : ev;
     const curRect = overlay.getBoundingClientRect();
@@ -819,6 +856,8 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     tempBox.style.top = (y * 100) + '%';
     tempBox.style.width = (w * 100) + '%';
     tempBox.style.height = (h * 100) + '%';
+    
+    updateMagnifier(coords.clientX, coords.clientY, pageNum);
   }
   
   function upHandler(ev) {
@@ -841,6 +880,7 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     let h = Math.abs(startYPercent - curYPercent);
     
     tempBox.remove();
+    hideMagnifier();
     
     // Tap instead of drag spawns default patch size
     if (w < 0.005 || h < 0.005) {
@@ -1023,6 +1063,11 @@ function makeDraggable(element, annotationId, isSignature) {
     
     isDragging = false;
     
+    const anno = state.annotations.find(a => a.id === annotationId);
+    if (anno) {
+      updateMagnifier(coords.clientX, coords.clientY, anno.page);
+    }
+    
     if (isTouch) {
       window.addEventListener('touchmove', dragMoveTouch, { passive: false });
       window.addEventListener('touchend', dragEndTouch);
@@ -1062,6 +1107,11 @@ function makeDraggable(element, annotationId, isSignature) {
       
       element.style.left = (clampedLeft * 100) + '%';
       element.style.top = (clampedTop * 100) + '%';
+      
+      const anno = state.annotations.find(a => a.id === annotationId);
+      if (anno) {
+        updateMagnifier(coords.clientX, coords.clientY, anno.page);
+      }
     }
   }
   
@@ -1078,6 +1128,7 @@ function makeDraggable(element, annotationId, isSignature) {
   }
   
   function dragEnd() {
+    hideMagnifier();
     if (isDragging) {
       element.classList.remove('dragging');
       
@@ -1135,6 +1186,11 @@ function makeResizable(element, handle, annotationId) {
     
     isResizing = true;
     
+    const anno = state.annotations.find(a => a.id === annotationId);
+    if (anno) {
+      updateMagnifier(coords.clientX, coords.clientY, anno.page);
+    }
+    
     if (isTouch) {
       window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
       window.addEventListener('touchend', resizeEndTouch);
@@ -1174,6 +1230,8 @@ function makeResizable(element, handle, annotationId) {
       element.style.width = (newWidthPercent * 100) + '%';
       element.style.height = (newHeightPercent * 100) + '%';
     }
+    
+    updateMagnifier(coords.clientX, coords.clientY, anno.page);
   }
   
   function resizeEndMouse() {
@@ -1189,6 +1247,7 @@ function makeResizable(element, handle, annotationId) {
   }
   
   function resizeEnd() {
+    hideMagnifier();
     if (isResizing) {
       isResizing = false;
       
@@ -1242,6 +1301,11 @@ function makeCorrectorResizable(element, handle, annotationId) {
     
     isResizing = true;
     
+    const anno = state.annotations.find(a => a.id === annotationId);
+    if (anno) {
+      updateMagnifier(coords.clientX, coords.clientY, anno.page);
+    }
+    
     if (isTouch) {
       window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
       window.addEventListener('touchend', resizeEndTouch);
@@ -1285,6 +1349,8 @@ function makeCorrectorResizable(element, handle, annotationId) {
     if (anno.yPercent + newHeightPercent <= 1) {
       element.style.height = (newHeightPercent * 100) + '%';
     }
+    
+    updateMagnifier(coords.clientX, coords.clientY, anno.page);
   }
   
   function resizeEndMouse() {
@@ -1300,6 +1366,7 @@ function makeCorrectorResizable(element, handle, annotationId) {
   }
   
   function resizeEnd() {
+    hideMagnifier();
     if (isResizing) {
       isResizing = false;
       
@@ -1464,6 +1531,8 @@ function initSignaturePad() {
   dom.btnRemoveImgSig.addEventListener('click', removeImgSigPreview);
 }
 
+let smoothedPressure = 0.5;
+
 function startSigDrawing(e) {
   e.preventDefault();
   isSigDrawing = true;
@@ -1472,13 +1541,15 @@ function startSigDrawing(e) {
   const x = (e.clientX - rect.left) * (340 / rect.width);
   const y = (e.clientY - rect.top) * (242 / rect.height);
   
-  // Read S Pen pointer pressure (fallback to standard pressure values)
+  // Initialize smoothed pressure to pointer start
+  smoothedPressure = 0.5;
   const pressure = getPointerPressure(e);
   
   drawingPoints = [{ x, y, pressure }];
   
+  const w = getDynamicStrokeWidth(pressure);
   sigPadCtx.beginPath();
-  sigPadCtx.arc(x, y, getDynamicStrokeWidth(pressure) / 2, 0, Math.PI * 2);
+  sigPadCtx.arc(x, y, w / 2, 0, Math.PI * 2);
   sigPadCtx.fillStyle = drawColor;
   sigPadCtx.fill();
 }
@@ -1494,27 +1565,42 @@ function drawSig(e) {
   
   drawingPoints.push({ x, y, pressure });
   
-  // Bezier curve interpolation smoothing
+  // Bezier curve interpolation with high-density tintero smoothing
   if (drawingPoints.length > 2) {
-    const xc = (drawingPoints[drawingPoints.length - 2].x + drawingPoints[drawingPoints.length - 1].x) / 2;
-    const yc = (drawingPoints[drawingPoints.length - 2].y + drawingPoints[drawingPoints.length - 1].y) / 2;
+    const p0 = drawingPoints[drawingPoints.length - 3];
+    const p1 = drawingPoints[drawingPoints.length - 2];
     
-    sigPadCtx.beginPath();
-    sigPadCtx.moveTo(drawingPoints[drawingPoints.length - 3].x, drawingPoints[drawingPoints.length - 3].y);
-    sigPadCtx.quadraticCurveTo(
-      drawingPoints[drawingPoints.length - 2].x,
-      drawingPoints[drawingPoints.length - 2].y,
-      xc,
-      yc
-    );
+    // Midpoints for smooth Bezier transitions
+    const xcStart = (p0.x + p1.x) / 2;
+    const ycStart = (p0.y + p1.y) / 2;
     
-    // Dynamic line width scaled with S Pen physical pressure sensing
-    const avgPressure = (drawingPoints[drawingPoints.length - 3].pressure + drawingPoints[drawingPoints.length - 2].pressure + pressure) / 3;
-    sigPadCtx.lineWidth = getDynamicStrokeWidth(avgPressure);
-    sigPadCtx.strokeStyle = drawColor;
-    sigPadCtx.lineCap = 'round';
-    sigPadCtx.lineJoin = 'round';
-    sigPadCtx.stroke();
+    const p2 = drawingPoints[drawingPoints.length - 1];
+    const xcEnd = (p1.x + p2.x) / 2;
+    const ycEnd = (p1.y + p2.y) / 2;
+    
+    // We draw from xcStart to xcEnd using p1 as the Bezier control point
+    const w0 = getDynamicStrokeWidth(p1.pressure);
+    const w2 = getDynamicStrokeWidth((p1.pressure + p2.pressure) / 2);
+    
+    const dx = xcEnd - xcStart;
+    const dy = ycEnd - ycStart;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Draw micro-circles every 0.3px to guarantee a continuous fluid line
+    const steps = Math.max(15, Math.floor(dist / 0.3));
+    
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      // Quadratic Bezier interpolation formula
+      const cx = (1 - t) * (1 - t) * xcStart + 2 * (1 - t) * t * p1.x + t * t * xcEnd;
+      const cy = (1 - t) * (1 - t) * ycStart + 2 * (1 - t) * t * p1.y + t * t * ycEnd;
+      const cw = w0 + (w2 - w0) * t;
+      
+      sigPadCtx.beginPath();
+      sigPadCtx.arc(cx, cy, cw / 2, 0, Math.PI * 2);
+      sigPadCtx.fillStyle = drawColor;
+      sigPadCtx.fill();
+    }
   }
   
   if (!sigHasDrawn) {
@@ -1535,14 +1621,17 @@ function clearSigPad() {
 }
 
 function getPointerPressure(e) {
-  // stylus provides pressure metrics between 0.0 and 1.0
+  let pressure = 0.5;
+  // physical S Pen stylus reports pressure values between 0.0 and 1.0
   if (e.pointerType === 'pen') {
-    return e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
+    pressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
+  } else if (e.pressure > 0 && e.pressure !== 0.5) {
+    pressure = e.pressure;
   }
-  if (e.pressure > 0 && e.pressure !== 0.5) {
-    return e.pressure;
-  }
-  return 0.5; // Touch or Mouse defaults
+  
+  // Exponential Moving Average filter (Low pass) for absolute stroke smoothness
+  smoothedPressure = (smoothedPressure * 0.75) + (pressure * 0.25);
+  return smoothedPressure;
 }
 
 function getDynamicStrokeWidth(pressure) {
@@ -2055,7 +2144,9 @@ async function generateAndExportPdf(downloadFileName) {
           y: pdfY,
           size: anno.fontSize,
           font: activeFont,
-          color: hexToPdfColor(anno.color)
+          color: hexToPdfColor(anno.color),
+          maxWidth: anno.widthPercent ? anno.widthPercent * width : undefined,
+          lineHeight: anno.fontSize * 1.2
         });
       } else if (anno.type === 'signature') {
         const base64Str = anno.imgData.split(',')[1];
@@ -2106,5 +2197,286 @@ async function generateAndExportPdf(downloadFileName) {
     alert('Fallo al exportar PDF: ' + err.message);
   } finally {
     hideLoading();
+  }
+}
+
+// -------------------------------------------------------------
+// Interactive Mobile Helpers & Gestures Integration
+// -------------------------------------------------------------
+
+let gestureStartZoom = 1.0;
+let gestureStartDistance = 0;
+let gestureStartPanX = 0;
+let gestureStartPanY = 0;
+let gestureStartMidpoint = { x: 0, y: 0 };
+let isPinching = false;
+
+function initTouchGestures() {
+  const viewer = dom.viewerContainer;
+  if (!viewer) return;
+  
+  viewer.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      isPinching = true;
+      gestureStartZoom = state.zoom;
+      gestureStartDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      gestureStartPanX = state.panX;
+      gestureStartPanY = state.panY;
+      gestureStartMidpoint = getTouchMidpoint(e.touches[0], e.touches[1]);
+    }
+  }, { passive: true });
+  
+  viewer.addEventListener('touchmove', (e) => {
+    if (isPinching && e.touches.length === 2) {
+      e.preventDefault(); // prevent native browser scrolling / zooming
+      
+      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      if (gestureStartDistance > 0) {
+        const factor = currentDistance / gestureStartDistance;
+        state.zoom = Math.max(1.0, Math.min(4.0, gestureStartZoom * factor));
+      }
+      
+      const currentMidpoint = getTouchMidpoint(e.touches[0], e.touches[1]);
+      const dx = currentMidpoint.x - gestureStartMidpoint.x;
+      const dy = currentMidpoint.y - gestureStartMidpoint.y;
+      
+      state.panX = gestureStartPanX + dx;
+      state.panY = gestureStartPanY + dy;
+      
+      updateZoomTransform();
+    }
+  }, { passive: false });
+  
+  viewer.addEventListener('touchend', (e) => {
+    if (isPinching && e.touches.length < 2) {
+      isPinching = false;
+      // If close to baseline scale, snap back to standard sizing
+      if (state.zoom <= 1.05) {
+        state.zoom = 1.0;
+        state.panX = 0;
+        state.panY = 0;
+        updateZoomTransform();
+      }
+    }
+  });
+}
+
+function getTouchDistance(t1, t2) {
+  const dx = t1.clientX - t2.clientX;
+  const dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getTouchMidpoint(t1, t2) {
+  return {
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2
+  };
+}
+
+function updateZoomTransform() {
+  if (dom.zoomContentWrapper) {
+    dom.zoomContentWrapper.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+  }
+}
+
+function makeHorizontalResizable(element, handle, annotationId) {
+  let startX = 0;
+  let startWidthPercent = 0;
+  let isResizing = false;
+  
+  handle.addEventListener('mousedown', resizeStartMouse);
+  handle.addEventListener('touchstart', resizeStartTouch, { passive: false });
+  
+  function resizeStartMouse(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeStart(e, false);
+  }
+  
+  // Mobile finger triggers
+  function resizeStartTouch(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeStart(e.touches[0], true);
+  }
+  
+  function resizeStart(coords, isTouch) {
+    startX = coords.clientX;
+    
+    const parent = element.parentElement;
+    const parentRect = parent.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    
+    startWidthPercent = rect.width / parentRect.width;
+    isResizing = true;
+    
+    const anno = state.annotations.find(a => a.id === annotationId);
+    if (anno) {
+      updateMagnifier(coords.clientX, coords.clientY, anno.page);
+    }
+    
+    if (isTouch) {
+      window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
+      window.addEventListener('touchend', resizeEndTouch);
+    } else {
+      window.addEventListener('mousemove', resizeMoveMouse);
+      window.addEventListener('mouseup', resizeEndMouse);
+    }
+  }
+  
+  function resizeMoveMouse(e) {
+    resizeMove(e);
+  }
+  
+  function resizeMoveTouch(e) {
+    e.preventDefault();
+    resizeMove(e.touches[0]);
+  }
+  
+  function resizeMove(coords) {
+    if (!isResizing) return;
+    
+    const parent = element.parentElement;
+    const parentRect = parent.getBoundingClientRect();
+    
+    const dx = coords.clientX - startX;
+    const widthChange = dx / parentRect.width;
+    
+    let newWidthPercent = startWidthPercent + widthChange;
+    // Keep width inside reasonable bounds on screen (10% to 95% of container width)
+    newWidthPercent = Math.max(0.1, Math.min(0.95, newWidthPercent));
+    
+    const anno = state.annotations.find(a => a.id === annotationId);
+    if (!anno) return;
+    
+    if (anno.xPercent + newWidthPercent <= 1) {
+      element.style.width = (newWidthPercent * 100) + '%';
+      anno.widthPercent = newWidthPercent; // update on the fly so text wraps dynamically
+    }
+    
+    updateMagnifier(coords.clientX, coords.clientY, anno.page);
+  }
+  
+  function resizeEndMouse() {
+    window.removeEventListener('mousemove', resizeMoveMouse);
+    window.removeEventListener('mouseup', resizeEndMouse);
+    resizeEnd();
+  }
+  
+  function resizeEndTouch() {
+    window.removeEventListener('touchmove', resizeMoveTouch);
+    window.removeEventListener('touchend', resizeEndTouch);
+    resizeEnd();
+  }
+  
+  function resizeEnd() {
+    hideMagnifier();
+    if (isResizing) {
+      isResizing = false;
+      
+      const parent = element.parentElement;
+      const rect = element.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      
+      const finalWidthPercent = rect.width / parentRect.width;
+      
+      const anno = state.annotations.find(a => a.id === annotationId);
+      if (anno) {
+        anno.widthPercent = finalWidthPercent;
+        saveHistoryState();
+      }
+    }
+  }
+}
+
+function updateMagnifier(clientX, clientY, pageNum) {
+  const magnifier = dom.magnifier;
+  const magCanvas = dom.magnifierCanvas;
+  if (!magnifier || !magCanvas) return;
+
+  const pageContainer = document.querySelector(`.pdf-page-container[data-page="${pageNum}"]`);
+  if (!pageContainer) return;
+
+  const pdfCanvas = pageContainer.querySelector('canvas');
+  if (!pdfCanvas) return;
+
+  // Render the circular lens float
+  magnifier.classList.remove('hidden');
+
+  // Place above pointer (e.g. 70px left offset to center, 150px top offset to clear fingers)
+  const magX = clientX - 70;
+  const magY = clientY - 150;
+  magnifier.style.left = magX + 'px';
+  magnifier.style.top = magY + 'px';
+
+  const ctx = magCanvas.getContext('2d');
+  ctx.clearRect(0, 0, 140, 140);
+
+  // Translate client coordinates relative to visual bounds
+  const canvasRect = pdfCanvas.getBoundingClientRect();
+  const relX = (clientX - canvasRect.left) / canvasRect.width;
+  const relY = (clientY - canvasRect.top) / canvasRect.height;
+
+  // Map to actual pixel resolution coordinates
+  const sourceX = relX * pdfCanvas.width;
+  const sourceY = relY * pdfCanvas.height;
+
+  // Draw scaled crop under lens magnification (2.5x)
+  const scaleRatio = pdfCanvas.width / canvasRect.width;
+  const sourceDim = 56 * scaleRatio;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(70, 70, 70, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Draw clean solid background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 140, 140);
+
+  // Copy high definition pixel block from parent canvas
+  ctx.drawImage(
+    pdfCanvas,
+    sourceX - sourceDim / 2,
+    sourceY - sourceDim / 2,
+    sourceDim,
+    sourceDim,
+    0,
+    0,
+    140,
+    140
+  );
+
+  // Draw a pixel alignment crosshair
+  ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(70, 50);
+  ctx.lineTo(70, 90);
+  ctx.moveTo(50, 70);
+  ctx.lineTo(90, 70);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function hideMagnifier() {
+  if (dom.magnifier) {
+    dom.magnifier.classList.add('hidden');
+  }
+}
+
+function clearUserDataAndReset() {
+  if (confirm('¿Estás seguro de que quieres cerrar la sesión y limpiar todos tus datos locales de este navegador? Esto eliminará de forma permanente tus firmas guardadas y el progreso actual.')) {
+    try {
+      localStorage.removeItem('pdf_filler_state');
+      localStorage.removeItem('pdf_filler_signatures');
+      alert('¡Datos eliminados correctamente!');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error cleaning user data:', err);
+      alert('Fallo al limpiar los datos de usuario.');
+    }
   }
 }
