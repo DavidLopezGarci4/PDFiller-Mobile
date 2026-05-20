@@ -2141,7 +2141,13 @@ async function generateAndExportPdf(downloadFileName) {
     
     showLoading('Escribiendo anotaciones y firmas...');
     
-    for (const anno of state.annotations) {
+    // Sort annotations so corrector elements are drawn first, followed by signatures and text
+    const typeOrder = { 'corrector': 1, 'signature': 2, 'text': 3 };
+    const sortedAnnotations = [...state.annotations].sort((a, b) => {
+      return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
+    });
+    
+    for (const anno of sortedAnnotations) {
       const index = anno.page - 1;
       if (index >= pages.length) continue;
       
