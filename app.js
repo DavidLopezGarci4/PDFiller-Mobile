@@ -467,16 +467,69 @@ async function renderPdf() {
       overlay.className = 'pdf-overlay';
       overlay.dataset.page = pageNum;
       
-      // Bind Tap overlay to place annotators
-      overlay.addEventListener('click', (e) => handlePageClick(e, pageNum, overlay));
+      // Bind Tap overlay to place annotators using standard mouse click for desktop / stylus fallback
+      overlay.addEventListener('click', (e) => {
+        // If it was a touch-triggered click, ignore it as touchend will handle it
+        if (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents)) {
+          return;
+        }
+        handlePageClick(e, pageNum, overlay);
+      });
       
-      // Bind S Pen & Touch drawing corrector parches
+      // Gesture Guard touch detection for Mobile to prevent accidental placements during zoom/pan
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchHasMoved = false;
+      let touchCount = 0;
+      
       overlay.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchHasMoved = false;
+        touchCount = e.touches.length;
+        
         if (state.selectedTool === 'corrector') {
           e.preventDefault(); // stop scrolling viewport
           startCorrectorDraw(e.touches[0], pageNum, overlay, true);
         }
       }, { passive: false });
+      
+      overlay.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 1) {
+          touchHasMoved = true;
+        }
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        if (Math.sqrt(dx*dx + dy*dy) > 8) {
+          touchHasMoved = true;
+        }
+      }, { passive: true });
+      
+      overlay.addEventListener('touchend', (e) => {
+        if (e.target.closest('.annotation-text-element') || 
+            e.target.closest('.annotation-sig-element') || 
+            e.target.closest('.annotation-corrector-element')) {
+          return;
+        }
+        
+        if (!touchHasMoved && touchCount === 1 && state.selectedTool !== 'select' && state.selectedTool !== 'corrector') {
+          const touch = e.changedTouches[0];
+          const rect = overlay.getBoundingClientRect();
+          const xPercent = (touch.clientX - rect.left) / rect.width;
+          const yPercent = (touch.clientY - rect.top) / rect.height;
+          
+          if (state.selectedTool === 'text') {
+            addTextAnnotation(pageNum, xPercent, yPercent);
+          } else if (state.selectedTool === 'signature') {
+            if (!state.activeSignatureId) {
+              openDrawer('drawer-sig', 'nav-btn-signature');
+              alert('Selecciona una firma de tu galería o crea una nueva con tu S Pen.');
+              return;
+            }
+            addSignatureAnnotation(pageNum, xPercent, yPercent);
+          }
+        }
+      });
       
       overlay.addEventListener('mousedown', (e) => {
         if (state.selectedTool === 'corrector') {
@@ -584,18 +637,23 @@ function addTextAnnotation(pageNum, xPercent, yPercent, text = 'Texto...', custo
     
     // Auto-focus and open keypad
     setTimeout(() => {
-      textEl.focus();
-      // Select all for instant typing overwrite
-      const range = document.createRange();
-      range.selectNodeContents(textEl);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      const contentEl = textEl.querySelector('.annotation-text-content');
+      if (contentEl) {
+        contentEl.focus();
+        // Select all for instant typing overwrite
+        const range = document.createRange();
+        range.selectNodeContents(contentEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
     }, 100);
   }
   
   updateElementCount();
   saveHistoryState();
+  switchTool('select');
+  closeAllDrawers();
 }
 
 // Add Signature Annotation
@@ -632,6 +690,8 @@ function addSignatureAnnotation(pageNum, xPercent, yPercent) {
   
   updateElementCount();
   saveHistoryState();
+  switchTool('select');
+  closeAllDrawers();
 }
 
 // Dom rendering bindings for active annotations
@@ -639,8 +699,6 @@ function createTextDomElement(anno) {
   const el = document.createElement('div');
   el.className = 'annotation-text-element';
   el.id = `anno-${anno.id}`;
-  el.contentEditable = true;
-  el.spellcheck = false;
   el.style.left = (anno.xPercent * 100) + '%';
   el.style.top = (anno.yPercent * 100) + '%';
   el.style.width = anno.widthPercent ? (anno.widthPercent * 100) + '%' : 'auto';
@@ -654,7 +712,13 @@ function createTextDomElement(anno) {
   el.style.fontFamily = cssFont;
   el.style.fontSize = anno.fontSize + 'px';
   el.style.color = anno.color;
-  el.innerText = anno.text;
+  
+  const contentEl = document.createElement('div');
+  contentEl.className = 'annotation-text-content';
+  contentEl.contentEditable = true;
+  contentEl.spellcheck = false;
+  contentEl.innerText = anno.text;
+  el.appendChild(contentEl);
   
   if (state.activeAnnotationId === anno.id) el.classList.add('active');
   
@@ -662,17 +726,14 @@ function createTextDomElement(anno) {
   const delBtn = document.createElement('button');
   delBtn.className = 'anno-btn-delete';
   delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-  delBtn.addEventListener('mousedown', (e) => {
+  
+  const deleteHandler = (e) => {
     e.preventDefault();
     e.stopPropagation();
     deleteAnnotation(anno.id);
-  });
-  // Add mobile touch listener as fallback
-  delBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    deleteAnnotation(anno.id);
-  });
+  };
+  delBtn.addEventListener('mousedown', deleteHandler);
+  delBtn.addEventListener('touchstart', deleteHandler);
   el.appendChild(delBtn);
   
   // Drag Resize corner handle
@@ -682,17 +743,17 @@ function createTextDomElement(anno) {
   makeHorizontalResizable(el, handle, anno.id);
   
   // Input tracking
-  el.addEventListener('focus', () => {
+  contentEl.addEventListener('focus', () => {
     setActiveAnnotation(anno.id);
-    state.lastFocusedTextValue = el.innerText;
+    state.lastFocusedTextValue = contentEl.innerText;
   });
-  el.addEventListener('input', () => {
-    anno.text = el.innerText;
+  contentEl.addEventListener('input', () => {
+    anno.text = contentEl.innerText;
   });
-  el.addEventListener('blur', () => {
-    if (el.innerText.trim() === '') {
+  contentEl.addEventListener('blur', () => {
+    if (contentEl.innerText.trim() === '') {
       deleteAnnotation(anno.id);
-    } else if (el.innerText !== state.lastFocusedTextValue) {
+    } else if (contentEl.innerText !== state.lastFocusedTextValue) {
       saveHistoryState();
     }
   });
@@ -2114,13 +2175,34 @@ async function generateAndExportPdf(downloadFileName) {
         });
       } else if (anno.type === 'signature') {
         const base64Str = anno.imgData.split(',')[1];
-        const pngBytes = new Uint8Array(
+        const imgBytes = new Uint8Array(
           atob(base64Str)
             .split('')
             .map(char => char.charCodeAt(0))
         );
         
-        const embeddedImg = await pdfDoc.embedPng(pngBytes);
+        let embeddedImg;
+        const isJpg = anno.imgData.includes('image/jpeg') || anno.imgData.includes('image/jpg');
+        
+        try {
+          if (isJpg) {
+            embeddedImg = await pdfDoc.embedJpg(imgBytes);
+          } else {
+            embeddedImg = await pdfDoc.embedPng(imgBytes);
+          }
+        } catch (err) {
+          console.warn("Attempting mobile signature embedding fallback due to error:", err);
+          try {
+            if (isJpg) {
+              embeddedImg = await pdfDoc.embedPng(imgBytes);
+            } else {
+              embeddedImg = await pdfDoc.embedJpg(imgBytes);
+            }
+          } catch (fallbackErr) {
+            console.error("Mobile signature embedding failed entirely:", fallbackErr);
+            throw fallbackErr;
+          }
+        }
         
         const pdfX = anno.xPercent * width;
         const pdfY = height - (anno.yPercent * height) - (anno.heightPercent * height);
