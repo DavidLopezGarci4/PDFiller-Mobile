@@ -115,11 +115,7 @@ const dom = {
   btnCloseSaveModal: document.getElementById('btn-close-save-modal'),
   saveFilenameInput: document.getElementById('save-filename-input'),
   btnCancelSave: document.getElementById('btn-cancel-save'),
-  btnConfirmSave: document.getElementById('btn-confirm-save'),
-
-  // Floating Magnifier Elements
-  magnifier: document.getElementById('magnifier'),
-  magnifierCanvas: document.getElementById('magnifier-canvas')
+  btnConfirmSave: document.getElementById('btn-confirm-save')
 };
 
 // -------------------------------------------------------------
@@ -839,8 +835,6 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
   tempBox.style.height = '0%';
   overlay.appendChild(tempBox);
   
-  updateMagnifier(clientX, clientY, pageNum);
-  
   function moveHandler(ev) {
     const coords = ev.touches && ev.touches.length > 0 ? ev.touches[0] : ev;
     const curRect = overlay.getBoundingClientRect();
@@ -856,8 +850,6 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     tempBox.style.top = (y * 100) + '%';
     tempBox.style.width = (w * 100) + '%';
     tempBox.style.height = (h * 100) + '%';
-    
-    updateMagnifier(coords.clientX, coords.clientY, pageNum);
   }
   
   function upHandler(ev) {
@@ -880,7 +872,6 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     let h = Math.abs(startYPercent - curYPercent);
     
     tempBox.remove();
-    hideMagnifier();
     
     // Tap instead of drag spawns default patch size
     if (w < 0.005 || h < 0.005) {
@@ -1063,11 +1054,6 @@ function makeDraggable(element, annotationId, isSignature) {
     
     isDragging = false;
     
-    const anno = state.annotations.find(a => a.id === annotationId);
-    if (anno) {
-      updateMagnifier(coords.clientX, coords.clientY, anno.page);
-    }
-    
     if (isTouch) {
       window.addEventListener('touchmove', dragMoveTouch, { passive: false });
       window.addEventListener('touchend', dragEndTouch);
@@ -1107,11 +1093,6 @@ function makeDraggable(element, annotationId, isSignature) {
       
       element.style.left = (clampedLeft * 100) + '%';
       element.style.top = (clampedTop * 100) + '%';
-      
-      const anno = state.annotations.find(a => a.id === annotationId);
-      if (anno) {
-        updateMagnifier(coords.clientX, coords.clientY, anno.page);
-      }
     }
   }
   
@@ -1128,7 +1109,6 @@ function makeDraggable(element, annotationId, isSignature) {
   }
   
   function dragEnd() {
-    hideMagnifier();
     if (isDragging) {
       element.classList.remove('dragging');
       
@@ -1186,11 +1166,6 @@ function makeResizable(element, handle, annotationId) {
     
     isResizing = true;
     
-    const anno = state.annotations.find(a => a.id === annotationId);
-    if (anno) {
-      updateMagnifier(coords.clientX, coords.clientY, anno.page);
-    }
-    
     if (isTouch) {
       window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
       window.addEventListener('touchend', resizeEndTouch);
@@ -1230,8 +1205,6 @@ function makeResizable(element, handle, annotationId) {
       element.style.width = (newWidthPercent * 100) + '%';
       element.style.height = (newHeightPercent * 100) + '%';
     }
-    
-    updateMagnifier(coords.clientX, coords.clientY, anno.page);
   }
   
   function resizeEndMouse() {
@@ -1247,7 +1220,6 @@ function makeResizable(element, handle, annotationId) {
   }
   
   function resizeEnd() {
-    hideMagnifier();
     if (isResizing) {
       isResizing = false;
       
@@ -1301,11 +1273,6 @@ function makeCorrectorResizable(element, handle, annotationId) {
     
     isResizing = true;
     
-    const anno = state.annotations.find(a => a.id === annotationId);
-    if (anno) {
-      updateMagnifier(coords.clientX, coords.clientY, anno.page);
-    }
-    
     if (isTouch) {
       window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
       window.addEventListener('touchend', resizeEndTouch);
@@ -1349,8 +1316,6 @@ function makeCorrectorResizable(element, handle, annotationId) {
     if (anno.yPercent + newHeightPercent <= 1) {
       element.style.height = (newHeightPercent * 100) + '%';
     }
-    
-    updateMagnifier(coords.clientX, coords.clientY, anno.page);
   }
   
   function resizeEndMouse() {
@@ -1366,7 +1331,6 @@ function makeCorrectorResizable(element, handle, annotationId) {
   }
   
   function resizeEnd() {
-    hideMagnifier();
     if (isResizing) {
       isResizing = false;
       
@@ -2311,11 +2275,6 @@ function makeHorizontalResizable(element, handle, annotationId) {
     startWidthPercent = rect.width / parentRect.width;
     isResizing = true;
     
-    const anno = state.annotations.find(a => a.id === annotationId);
-    if (anno) {
-      updateMagnifier(coords.clientX, coords.clientY, anno.page);
-    }
-    
     if (isTouch) {
       window.addEventListener('touchmove', resizeMoveTouch, { passive: false });
       window.addEventListener('touchend', resizeEndTouch);
@@ -2354,8 +2313,6 @@ function makeHorizontalResizable(element, handle, annotationId) {
       element.style.width = (newWidthPercent * 100) + '%';
       anno.widthPercent = newWidthPercent; // update on the fly so text wraps dynamically
     }
-    
-    updateMagnifier(coords.clientX, coords.clientY, anno.page);
   }
   
   function resizeEndMouse() {
@@ -2371,7 +2328,6 @@ function makeHorizontalResizable(element, handle, annotationId) {
   }
   
   function resizeEnd() {
-    hideMagnifier();
     if (isResizing) {
       isResizing = false;
       
@@ -2387,83 +2343,6 @@ function makeHorizontalResizable(element, handle, annotationId) {
         saveHistoryState();
       }
     }
-  }
-}
-
-function updateMagnifier(clientX, clientY, pageNum) {
-  const magnifier = dom.magnifier;
-  const magCanvas = dom.magnifierCanvas;
-  if (!magnifier || !magCanvas) return;
-
-  const pageContainer = document.querySelector(`.pdf-page-container[data-page="${pageNum}"]`);
-  if (!pageContainer) return;
-
-  const pdfCanvas = pageContainer.querySelector('canvas');
-  if (!pdfCanvas) return;
-
-  // Render the circular lens float
-  magnifier.classList.remove('hidden');
-
-  // Place above pointer (e.g. 70px left offset to center, 150px top offset to clear fingers)
-  const magX = clientX - 70;
-  const magY = clientY - 150;
-  magnifier.style.left = magX + 'px';
-  magnifier.style.top = magY + 'px';
-
-  const ctx = magCanvas.getContext('2d');
-  ctx.clearRect(0, 0, 140, 140);
-
-  // Translate client coordinates relative to visual bounds
-  const canvasRect = pdfCanvas.getBoundingClientRect();
-  const relX = (clientX - canvasRect.left) / canvasRect.width;
-  const relY = (clientY - canvasRect.top) / canvasRect.height;
-
-  // Map to actual pixel resolution coordinates
-  const sourceX = relX * pdfCanvas.width;
-  const sourceY = relY * pdfCanvas.height;
-
-  // Draw scaled crop under lens magnification (2.5x)
-  const scaleRatio = pdfCanvas.width / canvasRect.width;
-  const sourceDim = 56 * scaleRatio;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(70, 70, 70, 0, Math.PI * 2);
-  ctx.clip();
-
-  // Draw clean solid background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 140, 140);
-
-  // Copy high definition pixel block from parent canvas
-  ctx.drawImage(
-    pdfCanvas,
-    sourceX - sourceDim / 2,
-    sourceY - sourceDim / 2,
-    sourceDim,
-    sourceDim,
-    0,
-    0,
-    140,
-    140
-  );
-
-  // Draw a pixel alignment crosshair
-  ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(70, 50);
-  ctx.lineTo(70, 90);
-  ctx.moveTo(50, 70);
-  ctx.lineTo(90, 70);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function hideMagnifier() {
-  if (dom.magnifier) {
-    dom.magnifier.classList.add('hidden');
   }
 }
 

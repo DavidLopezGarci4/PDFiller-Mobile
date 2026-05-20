@@ -1397,7 +1397,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* -------------------------------------------------------------
- * Zoom Wrapper & Precision Magnifier Styles
+ * Zoom Wrapper Styles
  * ------------------------------------------------------------- */
 .zoom-content-wrapper {
   transform-origin: center top;
@@ -1407,23 +1407,4 @@ input[type="range"]::-webkit-slider-thumb {
   flex-direction: column;
   align-items: center;
   gap: 20px;
-}
-
-.magnifier {
-  position: absolute;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  border: 3px solid var(--accent);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 0 10px rgba(0,0,0,0.3);
-  overflow: hidden;
-  z-index: 9999;
-  pointer-events: none; /* Prevent blocking underlying touch gestures */
-  background-color: #ffffff;
-}
-
-.magnifier canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
 }
