@@ -960,6 +960,8 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     const corrEl = createCorrectorDomElement(newAnno);
     overlay.appendChild(corrEl);
     setActiveAnnotation(newAnno.id);
+    switchTool('select');
+    closeAllDrawers();
   }
   
   if (isTouch) {
@@ -2160,18 +2162,23 @@ async function generateAndExportPdf(downloadFileName) {
         if (anno.fontFamily === 'Courier New') activeFont = courierFont;
         if (anno.fontFamily === 'Quicksand') activeFont = quicksandFont;
         
+        // Calculate dynamic scale factor comparing the PDF page width and screen editor page width
+        const pageState = state.pages.find(p => p.pageNum === anno.page) || state.pages[index];
+        const scaleFactor = pageState ? (width / pageState.width) : 1.0;
+        const scaledFontSize = anno.fontSize * scaleFactor;
+
         const pdfX = anno.xPercent * width;
-        const offset = anno.fontSize * 0.82;
+        const offset = scaledFontSize * 0.82;
         const pdfY = height - (anno.yPercent * height) - offset;
         
         page.drawText(anno.text, {
           x: pdfX,
           y: pdfY,
-          size: anno.fontSize,
+          size: scaledFontSize,
           font: activeFont,
           color: hexToPdfColor(anno.color),
           maxWidth: anno.widthPercent ? anno.widthPercent * width : undefined,
-          lineHeight: anno.fontSize * 1.2
+          lineHeight: scaledFontSize * 1.2
         });
       } else if (anno.type === 'signature') {
         const base64Str = anno.imgData.split(',')[1];
