@@ -322,6 +322,9 @@ function initEventListeners() {
 
   // Multi-touch gestures
   initTouchGestures();
+
+  // Swipe down to close bottom drawers
+  initSwipeToCloseDrawers();
 }
 
 function switchTool(toolType) {
@@ -365,7 +368,11 @@ function openDrawer(drawerId, navBtnId) {
 }
 
 function closeAllDrawers() {
-  document.querySelectorAll('.bottom-drawer').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.bottom-drawer').forEach(d => {
+    d.classList.remove('active');
+    d.style.transform = '';
+    d.style.transition = '';
+  });
   dom.drawerOverlay.classList.remove('active');
   syncNavActiveTool();
 }
@@ -487,12 +494,7 @@ async function renderPdf() {
         touchStartY = e.touches[0].clientY;
         touchHasMoved = false;
         touchCount = e.touches.length;
-        
-        if (state.selectedTool === 'corrector') {
-          e.preventDefault(); // stop scrolling viewport
-          startCorrectorDraw(e.touches[0], pageNum, overlay, true);
-        }
-      }, { passive: false });
+      }, { passive: true });
       
       overlay.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
@@ -530,10 +532,12 @@ async function renderPdf() {
           }
         }
       });
-      
-      overlay.addEventListener('mousedown', (e) => {
+
+      // Unified Pointer Events for Corrector drawing (Touch / Stylus / Mouse)
+      overlay.addEventListener('pointerdown', (e) => {
         if (state.selectedTool === 'corrector') {
-          startCorrectorDraw(e, pageNum, overlay, false);
+          e.preventDefault(); // Stop scrolling viewport
+          startCorrectorDraw(e, pageNum, overlay);
         }
       });
       
@@ -856,7 +860,7 @@ function createCorrectorDomElement(anno) {
 // Interactive Intelligent Corrector Draw
 // -------------------------------------------------------------
 
-function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
+function startCorrectorDraw(e, pageNum, overlay) {
   if (state.selectedTool !== 'corrector') return;
   if (e.target.closest('.annotation-text-element') || 
       e.target.closest('.annotation-sig-element') || 
@@ -897,10 +901,9 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
   overlay.appendChild(tempBox);
   
   function moveHandler(ev) {
-    const coords = ev.touches && ev.touches.length > 0 ? ev.touches[0] : ev;
     const curRect = overlay.getBoundingClientRect();
-    const curXPercent = Math.max(0, Math.min(1, (coords.clientX - curRect.left) / curRect.width));
-    const curYPercent = Math.max(0, Math.min(1, (coords.clientY - curRect.top) / curRect.height));
+    const curXPercent = Math.max(0, Math.min(1, (ev.clientX - curRect.left) / curRect.width));
+    const curYPercent = Math.max(0, Math.min(1, (ev.clientY - curRect.top) / curRect.height));
     
     const x = Math.min(startXPercent, curXPercent);
     const y = Math.min(startYPercent, curYPercent);
@@ -914,18 +917,13 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
   }
   
   function upHandler(ev) {
-    if (isTouch) {
-      window.removeEventListener('touchmove', moveHandler);
-      window.removeEventListener('touchend', upHandler);
-    } else {
-      window.removeEventListener('mousemove', moveHandler);
-      window.removeEventListener('mouseup', upHandler);
-    }
+    window.removeEventListener('pointermove', moveHandler);
+    window.removeEventListener('pointerup', upHandler);
+    window.removeEventListener('pointercancel', upHandler);
     
-    const coords = ev.changedTouches && ev.changedTouches.length > 0 ? ev.changedTouches[0] : ev;
     const finalRect = overlay.getBoundingClientRect();
-    const curXPercent = Math.max(0, Math.min(1, (coords.clientX - finalRect.left) / finalRect.width));
-    const curYPercent = Math.max(0, Math.min(1, (coords.clientY - finalRect.top) / finalRect.height));
+    const curXPercent = Math.max(0, Math.min(1, (ev.clientX - finalRect.left) / finalRect.width));
+    const curYPercent = Math.max(0, Math.min(1, (ev.clientY - finalRect.top) / finalRect.height));
     
     let x = Math.min(startXPercent, curXPercent);
     let y = Math.min(startYPercent, curYPercent);
@@ -964,13 +962,9 @@ function startCorrectorDraw(e, pageNum, overlay, isTouch = false) {
     closeAllDrawers();
   }
   
-  if (isTouch) {
-    window.addEventListener('touchmove', moveHandler, { passive: true });
-    window.addEventListener('touchend', upHandler);
-  } else {
-    window.addEventListener('mousemove', moveHandler);
-    window.addEventListener('mouseup', upHandler);
-  }
+  window.addEventListener('pointermove', moveHandler);
+  window.addEventListener('pointerup', upHandler);
+  window.addEventListener('pointercancel', upHandler);
 }
 
 function rgbToHex(r, g, b) {
@@ -2447,4 +2441,53 @@ function clearUserDataAndReset() {
       alert('Fallo al limpiar los datos de usuario.');
     }
   }
+}
+
+// Swipe down to close bottom drawers smoothly
+function initSwipeToCloseDrawers() {
+  document.querySelectorAll('.bottom-drawer').forEach(drawer => {
+    const header = drawer.querySelector('.drawer-header');
+    if (!header) return;
+    
+    let startY = 0;
+    let currentY = 0;
+    let dy = 0;
+    let isDragging = false;
+    
+    header.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      isDragging = true;
+      drawer.style.transition = 'none';
+    }, { passive: true });
+    
+    header.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      currentY = e.touches[0].clientY;
+      dy = currentY - startY;
+      
+      if (dy > 0) {
+        drawer.style.transform = `translateY(${dy}px)`;
+        if (e.cancelable) e.preventDefault();
+      } else {
+        drawer.style.transform = 'translateY(0px)';
+      }
+    }, { passive: false });
+    
+    const endHandler = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      drawer.style.transition = '';
+      
+      if (dy > 80) {
+        closeAllDrawers();
+      } else {
+        drawer.style.transform = '';
+      }
+      dy = 0;
+    };
+    
+    header.addEventListener('touchend', endHandler);
+    header.addEventListener('touchcancel', endHandler);
+  });
 }
