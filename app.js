@@ -81,7 +81,6 @@ const dom = {
   btnClearAll: document.getElementById('btn-clear-all'),
   btnSaveCurrent: document.getElementById('btn-save-current'),
   btnSaveAs: document.getElementById('btn-save-as'),
-  btnSaveFinal: document.getElementById('btn-save-final'),
   btnClearUserData: document.getElementById('btn-clear-user-data'),
 
   // Drawer: Text Settings
@@ -218,7 +217,7 @@ function initEventListeners() {
   // Header quick actions
   dom.btnSaveFinalQuick.addEventListener('click', () => {
     if (state.pdfBytes) {
-      saveFinalPdf();
+      openSaveAsModal();
     } else {
       alert('Primero abre un archivo PDF.');
     }
@@ -236,10 +235,6 @@ function initEventListeners() {
   dom.btnSaveAs.addEventListener('click', () => {
     closeAllDrawers();
     openSaveAsModal();
-  });
-  dom.btnSaveFinal.addEventListener('click', () => {
-    closeAllDrawers();
-    saveFinalPdf();
   });
 
   // Undo / Redo & Clear All
