@@ -94,6 +94,10 @@
         <i class="fa-solid fa-eraser"></i>
         <span>Corrector</span>
       </button>
+      <button id="nav-btn-icon" class="nav-item" data-drawer="drawer-icon">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>Iconos</span>
+      </button>
     </nav>
 
     <!-- Bottom Sliding Drawers (Configuration Panels) -->
@@ -181,13 +185,13 @@
         </div>
         <!-- Font Size -->
         <div class="control-group" style="margin-top: 12px;">
-          <label><i class="fa-solid fa-text-height"></i> Tamaño (<span id="font-size-val">14</span>px)</label>
-          <input type="range" id="font-size-range" min="8" max="40" value="14">
+          <label><i class="fa-solid fa-text-height"></i> Tamaño (<span id="font-size-val">12</span>px)</label>
+          <input type="range" id="font-size-range" min="8" max="40" value="12">
           <div class="size-presets">
-            <button class="preset-btn" data-size="10">Pq</button>
-            <button class="preset-btn active" data-size="14">Md</button>
-            <button class="preset-btn" data-size="20">Gd</button>
-            <button class="preset-btn" data-size="28">Xl</button>
+            <button class="preset-btn" data-size="8">Pq</button>
+            <button class="preset-btn active" data-size="12">Md</button>
+            <button class="preset-btn" data-size="16">Gd</button>
+            <button class="preset-btn" data-size="20">Xl</button>
           </div>
         </div>
         <!-- Font Color -->
@@ -242,6 +246,53 @@
       <div class="drawer-body">
         <div class="tool-info-bar">
           <p><i class="fa-solid fa-eraser text-primary"></i> **Borrador inteligente**: Arrastra tu dedo o lápiz sobre cualquier área del PDF. Detectará automáticamente el color del fondo y la cubrirá con un parche corrector perfecto.</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Drawer: Icons Customization Options -->
+    <div class="bottom-drawer" id="drawer-icon">
+      <div class="drawer-header">
+        <div class="drawer-handle"></div>
+        <h3>Opciones de Iconos</h3>
+        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="drawer-body">
+        <div class="tool-info-bar">
+          <p><i class="fa-solid fa-circle-check text-accent"></i> **Validación rápida**: Elige un icono y toca el PDF para colocarlo. ¡Snapping inteligente lo centrará en la casilla!</p>
+        </div>
+        
+        <div class="control-group">
+          <label><i class="fa-solid fa-icons"></i> Tipo de Icono</label>
+          <div class="icon-selector-grid">
+            <button class="icon-option-btn active" data-icon-type="tick">
+              <i class="fa-solid fa-check"></i> <span>Tick (✓)</span>
+            </button>
+            <button class="icon-option-btn" data-icon-type="cross-sym">
+              <i class="fa-solid fa-x"></i> <span>Cruz S. (X)</span>
+            </button>
+            <button class="icon-option-btn" data-icon-type="cross-est">
+              <i class="fa-solid fa-xmark"></i> <span>Cruz E. (✗)</span>
+            </button>
+            <button class="icon-option-btn" data-icon-type="dot">
+              <i class="fa-solid fa-circle"></i> <span>Punto (●)</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="control-group" style="margin-top: 12px;">
+          <label for="icon-size-input"><i class="fa-solid fa-maximize"></i> Tamaño (<span id="icon-size-val">20</span>px)</label>
+          <input type="range" id="icon-size-input" min="12" max="36" value="20" step="1">
+        </div>
+        
+        <div class="control-group" style="margin-top: 12px;">
+          <label><i class="fa-solid fa-palette"></i> Color del Icono</label>
+          <div class="color-palette" id="icon-color-palette">
+            <button class="color-swatch active" data-color="#000000" style="background-color: #000000;" title="Negro"></button>
+            <button class="color-swatch" data-color="#1d4ed8" style="background-color: #1d4ed8;" title="Azul"></button>
+            <button class="color-swatch" data-color="#b91c1c" style="background-color: #b91c1c;" title="Rojo"></button>
+            <button class="color-swatch" data-color="#047857" style="background-color: #047857;" title="Verde"></button>
+          </div>
         </div>
       </div>
     </div>

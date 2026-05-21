@@ -26,7 +26,13 @@ const state = {
   // Default Annotation Styles
   defaultTextSettings: {
     fontFamily: 'Calibri',
-    fontSize: 14,
+    fontSize: 12,
+    color: '#000000'
+  },
+  
+  defaultIconSettings: {
+    iconType: 'tick', // 'tick', 'cross-sym', 'cross-est', 'dot'
+    size: 20,
     color: '#000000'
   },
   
@@ -62,7 +68,9 @@ const dom = {
   navBtnText: document.getElementById('nav-btn-text'),
   navBtnSignature: document.getElementById('nav-btn-signature'),
   navBtnCorrector: document.getElementById('nav-btn-corrector'),
+  navBtnIcon: document.getElementById('nav-btn-icon'),
   drawerOverlay: document.getElementById('drawer-overlay'),
+  drawerIcon: document.getElementById('drawer-icon'),
 
   // Drawer: Document Management
   docFilename: document.getElementById('doc-filename'),
@@ -115,7 +123,12 @@ const dom = {
   btnCloseSaveModal: document.getElementById('btn-close-save-modal'),
   saveFilenameInput: document.getElementById('save-filename-input'),
   btnCancelSave: document.getElementById('btn-cancel-save'),
-  btnConfirmSave: document.getElementById('btn-confirm-save')
+  btnConfirmSave: document.getElementById('btn-confirm-save'),
+  
+  // Icon Properties
+  iconSizeInput: document.getElementById('icon-size-input'),
+  iconSizeVal: document.getElementById('icon-size-val'),
+  iconColorPalette: document.getElementById('icon-color-palette')
 };
 
 // -------------------------------------------------------------
@@ -187,6 +200,11 @@ function initEventListeners() {
   dom.navBtnCorrector.addEventListener('click', () => {
     switchTool('corrector');
     toggleDrawer('drawer-corr', 'nav-btn-corrector');
+  });
+
+  dom.navBtnIcon.addEventListener('click', () => {
+    switchTool('icon');
+    toggleDrawer('drawer-icon', 'nav-btn-icon');
   });
 
   // Close Drawers when clicking overlay
@@ -280,6 +298,91 @@ function initEventListeners() {
     updateActiveOrPresetStyle('color', e.target.value);
   });
 
+  // Icon Customizations
+  if (dom.iconSizeInput) {
+    dom.iconSizeInput.addEventListener('input', (e) => {
+      const size = parseInt(e.target.value);
+      dom.iconSizeVal.innerText = size;
+      state.defaultIconSettings.size = size;
+      
+      // Dynamic resizing of active icon annotation
+      if (state.activeAnnotationId && state.activeAnnotationId.startsWith('ico-')) {
+        const anno = state.annotations.find(a => a.id === state.activeAnnotationId);
+        if (anno) {
+          anno.size = size;
+          const el = document.getElementById(`anno-${anno.id}`);
+          if (el) {
+            el.style.width = size + 'px';
+            el.style.height = size + 'px';
+            const inner = el.querySelector('.icon-inner');
+            if (inner) inner.style.fontSize = (size * 0.8) + 'px';
+          }
+          saveHistoryState();
+        }
+      }
+    });
+  }
+  
+  if (dom.iconColorPalette) {
+    dom.iconColorPalette.querySelectorAll('.color-swatch').forEach(swatch => {
+      swatch.addEventListener('click', (e) => {
+        dom.iconColorPalette.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        const color = swatch.dataset.color;
+        state.defaultIconSettings.color = color;
+        
+        // Dynamic color update of active icon annotation
+        if (state.activeAnnotationId && state.activeAnnotationId.startsWith('ico-')) {
+          const anno = state.annotations.find(a => a.id === state.activeAnnotationId);
+          if (anno) {
+            anno.color = color;
+            const el = document.getElementById(`anno-${anno.id}`);
+            if (el) el.style.color = color;
+            saveHistoryState();
+          }
+        }
+      });
+    });
+  }
+  
+  document.querySelectorAll('.icon-option-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.icon-option-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const iconType = btn.dataset.iconType;
+      state.defaultIconSettings.iconType = iconType;
+      
+      // Dynamic type update of active icon annotation
+      if (state.activeAnnotationId && state.activeAnnotationId.startsWith('ico-')) {
+        const anno = state.annotations.find(a => a.id === state.activeAnnotationId);
+        if (anno) {
+          anno.iconType = iconType;
+          const el = document.getElementById(`anno-${anno.id}`);
+          if (el) {
+            const inner = el.querySelector('.icon-inner');
+            if (inner) {
+              if (iconType === 'tick') {
+                inner.innerHTML = '<i class="fa-solid fa-check"></i>';
+              } else if (iconType === 'cross-sym') {
+                inner.innerHTML = `
+                  <svg viewBox="0 0 24 24" width="85%" height="85%" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none">
+                    <line x1="4" y1="4" x2="20" y2="20" />
+                    <line x1="4" y1="20" x2="20" y2="4" />
+                  </svg>
+                `;
+              } else if (iconType === 'cross-est') {
+                inner.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+              } else if (iconType === 'dot') {
+                inner.innerHTML = '<i class="fa-solid fa-circle"></i>';
+              }
+            }
+          }
+          saveHistoryState();
+        }
+      }
+    });
+  });
+
   // Signature Buttons
   dom.btnCreateSig.addEventListener('click', () => {
     closeAllDrawers();
@@ -294,6 +397,7 @@ function initEventListeners() {
     if (e.target.closest('.annotation-text-element') || 
         e.target.closest('.annotation-sig-element') || 
         e.target.closest('.annotation-corrector-element') ||
+        e.target.closest('.annotation-icon-element') ||
         e.target.closest('.bottom-drawer') ||
         e.target.closest('.bottom-nav') ||
         e.target.closest('.modal-overlay') ||
@@ -338,6 +442,9 @@ function syncNavActiveTool() {
   dom.navBtnText.classList.toggle('active', state.selectedTool === 'text');
   dom.navBtnSignature.classList.toggle('active', state.selectedTool === 'signature');
   dom.navBtnCorrector.classList.toggle('active', state.selectedTool === 'corrector');
+  if (dom.navBtnIcon) {
+    dom.navBtnIcon.classList.toggle('active', state.selectedTool === 'icon');
+  }
 }
 
 function toggleDrawer(drawerId, navBtnId) {
@@ -510,7 +617,8 @@ async function renderPdf() {
       overlay.addEventListener('touchend', (e) => {
         if (e.target.closest('.annotation-text-element') || 
             e.target.closest('.annotation-sig-element') || 
-            e.target.closest('.annotation-corrector-element')) {
+            e.target.closest('.annotation-corrector-element') ||
+            e.target.closest('.annotation-icon-element')) {
           return;
         }
         
@@ -529,6 +637,21 @@ async function renderPdf() {
               return;
             }
             addSignatureAnnotation(pageNum, xPercent, yPercent);
+          } else if (state.selectedTool === 'icon') {
+            let finalXPercent = xPercent;
+            let finalYPercent = yPercent;
+            
+            const pageState = state.pages.find(p => p.pageNum === pageNum);
+            if (pageState && pageState.canvas) {
+              const clickX = xPercent * pageState.canvas.width;
+              const clickY = yPercent * pageState.canvas.height;
+              const snapped = findCheckboxCenter(pageState.canvas, clickX, clickY);
+              if (snapped) {
+                finalXPercent = snapped.x / pageState.canvas.width;
+                finalYPercent = snapped.y / pageState.canvas.height;
+              }
+            }
+            addIconAnnotation(pageNum, finalXPercent, finalYPercent);
           }
         }
       });
@@ -578,7 +701,8 @@ function handlePageClick(e, pageNum, overlay) {
   // Stop placing if clicked inside existing active items
   if (e.target.closest('.annotation-text-element') || 
       e.target.closest('.annotation-sig-element') || 
-      e.target.closest('.annotation-corrector-element')) {
+      e.target.closest('.annotation-corrector-element') ||
+      e.target.closest('.annotation-icon-element')) {
     return;
   }
   
@@ -597,6 +721,21 @@ function handlePageClick(e, pageNum, overlay) {
       return;
     }
     addSignatureAnnotation(pageNum, xPercent, yPercent);
+  } else if (state.selectedTool === 'icon') {
+    let finalXPercent = xPercent;
+    let finalYPercent = yPercent;
+    
+    const pageState = state.pages.find(p => p.pageNum === pageNum);
+    if (pageState && pageState.canvas) {
+      const clickX = xPercent * pageState.canvas.width;
+      const clickY = yPercent * pageState.canvas.height;
+      const snapped = findCheckboxCenter(pageState.canvas, clickX, clickY);
+      if (snapped) {
+        finalXPercent = snapped.x / pageState.canvas.width;
+        finalYPercent = snapped.y / pageState.canvas.height;
+      }
+    }
+    addIconAnnotation(pageNum, finalXPercent, finalYPercent);
   }
 }
 
@@ -696,6 +835,179 @@ function addSignatureAnnotation(pageNum, xPercent, yPercent) {
   saveHistoryState();
   switchTool('select');
   closeAllDrawers();
+}
+
+// Add Icon Annotation
+function addIconAnnotation(pageNum, xPercent, yPercent) {
+  const page = state.pages.find(p => p.pageNum === pageNum);
+  const pageWidth = page ? page.width : 400;
+  const pageHeight = page ? page.height : 600;
+  
+  const size = state.defaultIconSettings.size;
+  const iconType = state.defaultIconSettings.iconType;
+  const color = state.defaultIconSettings.color;
+  
+  const widthPercent = size / pageWidth;
+  const heightPercent = size / pageHeight;
+  
+  // Position centered around the clicked/snapped coordinate
+  const newAnno = {
+    id: 'ico-' + Date.now() + Math.random().toString(36).substr(2, 5),
+    type: 'icon',
+    page: pageNum,
+    xPercent: Math.max(0, Math.min(1 - widthPercent, xPercent - (widthPercent / 2))),
+    yPercent: Math.max(0, Math.min(1 - heightPercent, yPercent - (heightPercent / 2))),
+    size: size,
+    iconType: iconType,
+    color: color
+  };
+  
+  state.annotations.push(newAnno);
+  
+  const overlay = document.querySelector(`.pdf-overlay[data-page="${pageNum}"]`);
+  if (overlay) {
+    const iconEl = createIconDomElement(newAnno);
+    overlay.appendChild(iconEl);
+    setActiveAnnotation(newAnno.id);
+  }
+  
+  updateElementCount();
+  saveHistoryState();
+}
+
+// Create DOM structure for Icon Annotations
+function createIconDomElement(anno) {
+  const el = document.createElement('div');
+  el.className = 'annotation-icon-element';
+  el.id = `anno-${anno.id}`;
+  el.style.left = (anno.xPercent * 100) + '%';
+  el.style.top = (anno.yPercent * 100) + '%';
+  el.style.width = anno.size + 'px';
+  el.style.height = anno.size + 'px';
+  el.style.color = anno.color;
+  
+  const iconInner = document.createElement('div');
+  iconInner.className = 'icon-inner';
+  iconInner.style.width = '100%';
+  iconInner.style.height = '100%';
+  iconInner.style.display = 'flex';
+  iconInner.style.alignItems = 'center';
+  iconInner.style.justifyContent = 'center';
+  iconInner.style.fontSize = (anno.size * 0.8) + 'px';
+  iconInner.style.lineHeight = '1';
+  
+  if (anno.iconType === 'tick') {
+    iconInner.innerHTML = '<i class="fa-solid fa-check"></i>';
+  } else if (anno.iconType === 'cross-sym') {
+    iconInner.innerHTML = `
+      <svg viewBox="0 0 24 24" width="85%" height="85%" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none">
+        <line x1="4" y1="4" x2="20" y2="20" />
+        <line x1="4" y1="20" x2="20" y2="4" />
+      </svg>
+    `;
+  } else if (anno.iconType === 'cross-est') {
+    iconInner.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+  } else if (anno.iconType === 'dot') {
+    iconInner.innerHTML = '<i class="fa-solid fa-circle"></i>';
+  }
+  
+  el.appendChild(iconInner);
+  
+  // Trash button
+  const delBtn = document.createElement('button');
+  delBtn.className = 'anno-btn-delete';
+  delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+  const deleteHandler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteAnnotation(anno.id);
+  };
+  delBtn.addEventListener('mousedown', deleteHandler);
+  delBtn.addEventListener('touchstart', deleteHandler);
+  el.appendChild(delBtn);
+  
+  if (state.activeAnnotationId === anno.id) {
+    el.classList.add('active');
+  }
+  
+  const selectHandler = (e) => {
+    e.stopPropagation();
+    setActiveAnnotation(anno.id);
+  };
+  el.addEventListener('mousedown', selectHandler);
+  el.addEventListener('touchstart', selectHandler);
+  
+  makeDraggable(el, anno.id, true);
+  
+  return el;
+}
+
+// Client-side local scanning algorithm to detect and snap to checkbox boundaries
+function findCheckboxCenter(canvas, clickX, clickY) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  
+  const scanRadius = 25; // inspect a 50x50 neighborhood
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  const startX = Math.max(0, Math.floor(clickX - scanRadius));
+  const startY = Math.max(0, Math.floor(clickY - scanRadius));
+  const endX = Math.min(width - 1, Math.floor(clickX + scanRadius));
+  const endY = Math.min(height - 1, Math.floor(clickY + scanRadius));
+  
+  const scanW = endX - startX + 1;
+  const scanH = endY - startY + 1;
+  if (scanW <= 0 || scanH <= 0) return null;
+  
+  let imgData;
+  try {
+    imgData = ctx.getImageData(startX, startY, scanW, scanH);
+  } catch (err) {
+    console.warn("Failed to retrieve image data for snapping (cross-origin limitation):", err);
+    return null;
+  }
+  
+  const data = imgData.data;
+  let minX = scanW, maxX = -1, minY = scanH, maxY = -1;
+  let darkPixelCount = 0;
+  
+  for (let y = 0; y < scanH; y++) {
+    for (let x = 0; x < scanW; x++) {
+      const idx = (y * scanW + x) * 4;
+      const r = data[idx];
+      const g = data[idx+1];
+      const b = data[idx+2];
+      const a = data[idx+3];
+      
+      // Look for pixels that are relatively dark and fully opaque
+      if (a > 200 && (r < 180 && g < 180 && b < 180)) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        darkPixelCount++;
+      }
+    }
+  }
+  
+  if (darkPixelCount > 10 && darkPixelCount < (scanW * scanH * 0.6)) {
+    const boxW = maxX - minX + 1;
+    const boxH = maxY - minY + 1;
+    const ratio = boxW / boxH;
+    
+    // Checkboxes are typically square-ish and sized 8px to 45px inside our scan radius
+    if (boxW >= 8 && boxW <= 45 && boxH >= 8 && boxH <= 45 && ratio >= 0.6 && ratio <= 1.6) {
+      const localCenterX = minX + boxW / 2;
+      const localCenterY = minY + boxH / 2;
+      return {
+        x: startX + localCenterX,
+        y: startY + localCenterY
+      };
+    }
+  }
+  
+  return null;
 }
 
 // Dom rendering bindings for active annotations
@@ -1421,6 +1733,8 @@ function redrawAllAnnotations() {
         overlay.appendChild(createSignatureDomElement(anno));
       } else if (anno.type === 'corrector') {
         overlay.appendChild(createCorrectorDomElement(anno));
+      } else if (anno.type === 'icon') {
+        overlay.appendChild(createIconDomElement(anno));
       }
     }
   });
@@ -2142,7 +2456,7 @@ async function generateAndExportPdf(downloadFileName) {
     showLoading('Escribiendo anotaciones y firmas...');
     
     // Sort annotations so corrector elements are drawn first, followed by signatures and text
-    const typeOrder = { 'corrector': 1, 'signature': 2, 'text': 3 };
+    const typeOrder = { 'corrector': 1, 'signature': 2, 'text': 3, 'icon': 4 };
     const sortedAnnotations = [...state.annotations].sort((a, b) => {
       return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
     });
@@ -2237,8 +2551,71 @@ async function generateAndExportPdf(downloadFileName) {
           borderColor: hexToPdfColor(anno.color),
           borderWidth: 0
         });
+      } else if (anno.type === 'icon') {
+        const pageState = state.pages.find(p => p.pageNum === anno.page) || state.pages[index];
+        const scaleFactor = pageState ? (width / pageState.width) : 1.0;
+        const sizePdf = anno.size * scaleFactor;
+        
+        const pdfX = anno.xPercent * width;
+        const pdfY = height - (anno.yPercent * height) - sizePdf;
+        
+        const color = hexToPdfColor(anno.color);
+        const thickness = Math.max(1.5, sizePdf * 0.1);
+        
+        if (anno.iconType === 'tick') {
+          page.drawLine({
+            start: { x: pdfX + 0.22 * sizePdf, y: pdfY + 0.45 * sizePdf },
+            end: { x: pdfX + 0.45 * sizePdf, y: pdfY + 0.22 * sizePdf },
+            thickness: thickness,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+          page.drawLine({
+            start: { x: pdfX + 0.45 * sizePdf, y: pdfY + 0.22 * sizePdf },
+            end: { x: pdfX + 0.78 * sizePdf, y: pdfY + 0.78 * sizePdf },
+            thickness: thickness,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+        } else if (anno.iconType === 'cross-sym') {
+          page.drawLine({
+            start: { x: pdfX + 0.25 * sizePdf, y: pdfY + 0.25 * sizePdf },
+            end: { x: pdfX + 0.75 * sizePdf, y: pdfY + 0.75 * sizePdf },
+            thickness: thickness,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+          page.drawLine({
+            start: { x: pdfX + 0.25 * sizePdf, y: pdfY + 0.75 * sizePdf },
+            end: { x: pdfX + 0.75 * sizePdf, y: pdfY + 0.25 * sizePdf },
+            thickness: thickness,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+        } else if (anno.iconType === 'cross-est') {
+          page.drawLine({
+            start: { x: pdfX + 0.22 * sizePdf, y: pdfY + 0.78 * sizePdf },
+            end: { x: pdfX + 0.78 * sizePdf, y: pdfY + 0.22 * sizePdf },
+            thickness: thickness * 1.3,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+          page.drawLine({
+            start: { x: pdfX + 0.28 * sizePdf, y: pdfY + 0.22 * sizePdf },
+            end: { x: pdfX + 0.72 * sizePdf, y: pdfY + 0.78 * sizePdf },
+            thickness: thickness * 0.8,
+            color: color,
+            lineCap: PDFLib.LineCapStyle.Round
+          });
+        } else if (anno.iconType === 'dot') {
+          page.drawCircle({
+            x: pdfX + sizePdf / 2,
+            y: pdfY + sizePdf / 2,
+            radius: sizePdf * 0.25,
+            color: color
+          });
+        }
       }
-    }
     
     showLoading('Guardando PDF final...');
     const compiledBytes = await pdfDoc.save();

@@ -904,7 +904,8 @@ input[type="range"]::-webkit-slider-thumb {
 
 .annotation-text-element.active .anno-btn-delete,
 .annotation-sig-element.active .anno-btn-delete,
-.annotation-corrector-element.active .anno-btn-delete {
+.annotation-corrector-element.active .anno-btn-delete,
+.annotation-icon-element.active .anno-btn-delete {
   opacity: 1;
   visibility: visible;
 }
@@ -1440,4 +1441,63 @@ input[type="range"]::-webkit-slider-thumb {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+}
+
+/* Icons Toolbar Layout Grid */
+.icon-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+.icon-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+.icon-option-btn i {
+  font-size: 14px;
+}
+.icon-option-btn:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+.icon-option-btn.active {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Annotation Icon Elements in Editor Overlay */
+.annotation-icon-element {
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  cursor: move;
+  border: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none; /* Mobile dragging optimization */
+}
+.annotation-icon-element:hover {
+  outline: 1px dashed rgba(99, 102, 241, 0.4);
+  outline-offset: 2px;
+}
+.annotation-icon-element.active {
+  outline: 1px dashed var(--primary);
+  outline-offset: 2px;
 }
