@@ -2611,6 +2611,7 @@ async function generateAndExportPdf(downloadFileName) {
           });
         }
       }
+    }
     
     showLoading('Guardando PDF final...');
     const compiledBytes = await pdfDoc.save();

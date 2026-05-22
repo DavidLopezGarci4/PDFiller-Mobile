@@ -432,7 +432,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         // Use a cache-busting query to bypass aggressive HTTP cache for the registration script
-        navigator.serviceWorker.register('sw.js?v=3')
+        navigator.serviceWorker.register('sw.js?v=4')
           .then(reg => {
             console.log('Service Worker registrado correctamente.', reg.scope);
             
