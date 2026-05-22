@@ -130,7 +130,7 @@
             <i class="fa-solid fa-folder-open text-primary"></i> <span>Abrir otro PDF</span>
           </button>
           <button id="btn-save-current" class="btn btn-secondary btn-full">
-            <i class="fa-solid fa-floppy-disk text-primary"></i> <span>Guardar</span>
+            <i class="fa-solid fa-floppy-disk text-primary"></i> <span>Guardar progreso</span>
           </button>
           <button id="btn-save-as" class="btn btn-primary btn-full">
             <i class="fa-solid fa-file-export"></i> <span>Guardar como...</span>
@@ -432,7 +432,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         // Use a cache-busting query to bypass aggressive HTTP cache for the registration script
-        navigator.serviceWorker.register('sw.js?v=2')
+        navigator.serviceWorker.register('sw.js?v=3')
           .then(reg => {
             console.log('Service Worker registrado correctamente.', reg.scope);
             

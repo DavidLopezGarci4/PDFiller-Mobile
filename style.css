@@ -355,7 +355,7 @@ button, input, select, textarea {
   -webkit-backdrop-filter: var(--blur-glass);
   border-top: 1px solid var(--border-light);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   z-index: 200;
   box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3);
   padding-bottom: env(safe-area-inset-bottom); /* iOS Notch support */
