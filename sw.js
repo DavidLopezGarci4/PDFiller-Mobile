@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdfiller-mobile-v1';
+const CACHE_NAME = 'pdfiller-mobile-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -41,25 +41,49 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Fetch Event (Cache First with Network Fallback)
+// Fetch Event (Network-First for local files, Cache-First for CDNs)
 self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request).then((networkResponse) => {
-        // Cache dynamic assets if they are successful
-        if (networkResponse && networkResponse.status === 200 && e.request.method === 'GET') {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseClone);
-          });
+  if (e.request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(e.request.url);
+  const isLocalAsset = url.origin === self.location.origin;
+
+  if (isLocalAsset) {
+    // Network-First for local app files (ensures updates are live immediately)
+    e.respondWith(
+      fetch(e.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(e.request);
+        })
+    );
+  } else {
+    // Cache-First for static third-party CDNs (high performance, offline support)
+    e.respondWith(
+      caches.match(e.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return networkResponse;
-      }).catch(() => {
-        // If both fail, return empty or offline page if available
-      });
-    })
-  );
+        return fetch(e.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, responseClone);
+            });
+          }
+          return networkResponse;
+        });
+      })
+    );
+  }
 });
