@@ -431,9 +431,38 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('Service Worker registrado correctamente.', reg.scope))
+        // Use a cache-busting query to bypass aggressive HTTP cache for the registration script
+        navigator.serviceWorker.register('sw.js?v=2')
+          .then(reg => {
+            console.log('Service Worker registrado correctamente.', reg.scope);
+            
+            // Check for updates every 30 minutes in the background
+            setInterval(() => {
+              reg.update();
+            }, 30 * 60 * 1000);
+            
+            reg.onupdatefound = () => {
+              const installingWorker = reg.installing;
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('Nueva actualización detectada en segundo plano.');
+                  }
+                }
+              };
+            };
+          })
           .catch(err => console.warn('Fallo en el registro del Service Worker.', err));
+      });
+
+      // Handle controllerchange event to reload the page when the new Service Worker takes over (skipWaiting)
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          console.log('Nuevo Service Worker activado. Recargando para aplicar cambios...');
+          window.location.reload();
+        }
       });
     }
   </script>
