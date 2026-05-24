@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdfiller-mobile-v6';
+const CACHE_NAME = 'pdfiller2-cache-v1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
