@@ -45,32 +45,38 @@ window.editorModule = (() => {
         }, 120); // Ejecutar máximo una vez cada 120ms
     };
 
-    // Inyectar el botón redondo flotante de eliminación rápida y copiador de formato (tipo Word)
+    // Inyectar el menú flotante premium de 4 opciones (Formato, Editar, Mover, Eliminar)
     const injectQuickControls = (wrapper, field) => {
         if (wrapper.querySelector('.quick-controls-wrapper')) return;
         
         const controls = document.createElement('div');
         controls.className = 'quick-controls-wrapper';
         
-        // 1. Botón Copiar Formato (Paint Roller)
+        const input = wrapper.querySelector('.editable-field-input');
+        
+        // Inicializar estado de bloqueo por defecto
+        if (field.locked === undefined) field.locked = true;
+        
+        // 1. Botón de Formato (Púrpura)
         const formatBtn = document.createElement('button');
         formatBtn.className = 'btn-quick-action';
-        formatBtn.style.backgroundColor = '#8a2be2'; // Color púrpura premium
+        formatBtn.style.backgroundColor = '#8a2be2';
         formatBtn.style.color = 'white';
         formatBtn.style.border = '1px solid white';
         formatBtn.style.borderRadius = '50%';
-        formatBtn.style.width = '20px';
-        formatBtn.style.height = '20px';
-        formatBtn.style.fontSize = '9px';
+        formatBtn.style.width = '24px';
+        formatBtn.style.height = '24px';
+        formatBtn.style.fontSize = '10px';
         formatBtn.style.cursor = 'pointer';
+        formatBtn.style.display = 'inline-flex';
+        formatBtn.style.alignItems = 'center';
+        formatBtn.style.justifyContent = 'center';
         formatBtn.innerHTML = '<i class="fa-solid fa-paint-roller"></i>';
-        formatBtn.title = 'Copiar formato de este texto';
+        formatBtn.title = 'Copiar formato';
         
         formatBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
-            
-            const input = wrapper.querySelector('.editable-field-input');
             if (input) {
                 const style = window.getComputedStyle(input);
                 window.copiedFormat = {
@@ -80,96 +86,118 @@ window.editorModule = (() => {
                     fontWeight: style.fontWeight || 'normal',
                     fontFamily: style.fontFamily || 'Inter, sans-serif',
                     wrapperBg: wrapper.className.includes('field-bg-dark') ? 'field-bg-dark' : (wrapper.className.includes('field-bg-gray') ? 'field-bg-gray' : 'field-bg-light'),
-                    bgColor: window.getComputedStyle(wrapper).backgroundColor // Capturar color de fondo real de la caja
+                    bgColor: window.getComputedStyle(wrapper).backgroundColor
                 };
-                
-                // Cambiar el cursor visualmente para denotar "copiado"
                 const workspaceScroller = document.getElementById('pdf-scroller');
                 if (workspaceScroller) workspaceScroller.style.cursor = 'cell';
                 console.log('Formato de texto copiado:', window.copiedFormat);
             }
         });
 
-        // 2. Botón Eliminar
+        // 2. Botón de Editar Texto (Naranja)
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-quick-action';
+        editBtn.style.backgroundColor = '#f97316';
+        editBtn.style.color = 'white';
+        editBtn.style.border = '1px solid white';
+        editBtn.style.borderRadius = '50%';
+        editBtn.style.width = '24px';
+        editBtn.style.height = '24px';
+        editBtn.style.fontSize = '10px';
+        editBtn.style.cursor = 'pointer';
+        editBtn.style.display = 'inline-flex';
+        editBtn.style.alignItems = 'center';
+        editBtn.style.justifyContent = 'center';
+        editBtn.innerHTML = '<i class="fa-solid fa-file-pen"></i>';
+        editBtn.title = 'Editar texto';
+        
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            // Bloquear arrastre al editar
+            field.locked = true;
+            wrapper.classList.remove('dragging-enabled');
+            
+            // Activar foco y edición en el campo
+            input.style.pointerEvents = 'auto';
+            input.contentEditable = true;
+            input.focus();
+            
+            // Situar el cursor de texto al final
+            const range = document.createRange();
+            range.selectNodeContents(input);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        });
+
+        // 3. Botón de Mover Campo (Azul)
+        const moveBtn = document.createElement('button');
+        moveBtn.className = 'btn-quick-action';
+        moveBtn.style.backgroundColor = '#3b82f6';
+        moveBtn.style.color = 'white';
+        moveBtn.style.border = '1px solid white';
+        moveBtn.style.borderRadius = '50%';
+        moveBtn.style.width = '24px';
+        moveBtn.style.height = '24px';
+        moveBtn.style.fontSize = '10px';
+        moveBtn.style.cursor = 'pointer';
+        moveBtn.style.display = 'inline-flex';
+        moveBtn.style.alignItems = 'center';
+        moveBtn.style.justifyContent = 'center';
+        moveBtn.innerHTML = '<i class="fa-solid fa-arrows-up-down-left-right"></i>';
+        moveBtn.title = 'Mover campo';
+        
+        moveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            // Desbloquear arrastre interactivo
+            field.locked = false;
+            wrapper.classList.add('dragging-enabled');
+            
+            // Quitar modo de edición para poder arrastrar con suavidad en móviles
+            input.style.pointerEvents = 'none';
+            input.contentEditable = false;
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+        });
+
+        // 4. Botón de Eliminar (Rojo)
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn-quick-action';
-        deleteBtn.style.backgroundColor = '#ef4444'; // Rojo
+        deleteBtn.style.backgroundColor = '#ef4444';
         deleteBtn.style.color = 'white';
         deleteBtn.style.border = '1px solid white';
         deleteBtn.style.borderRadius = '50%';
-        deleteBtn.style.width = '20px';
-        deleteBtn.style.height = '20px';
-        deleteBtn.style.fontSize = '9px';
+        deleteBtn.style.width = '24px';
+        deleteBtn.style.height = '24px';
+        deleteBtn.style.fontSize = '10px';
         deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.display = 'inline-flex';
+        deleteBtn.style.alignItems = 'center';
+        deleteBtn.style.justifyContent = 'center';
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        deleteBtn.title = 'Eliminar este campo';
+        deleteBtn.title = 'Eliminar campo';
         
-        const performDelete = (e) => {
+        deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             if (window.historyManager) {
                 window.historyManager.deleteElement(field.id);
             }
-        };
-
-        deleteBtn.addEventListener('click', performDelete);
-        deleteBtn.addEventListener('pointerdown', performDelete);
-
-        // 3. Botón de Candado (Bloqueo/Desbloqueo de Arrastre)
-        const lockBtn = document.createElement('button');
-        lockBtn.className = 'btn-quick-action';
-        
-        // Inicializar estado de bloqueo
-        if (field.locked === undefined) field.locked = true;
-        
-        lockBtn.style.backgroundColor = field.locked ? '#475569' : '#3b82f6'; // Azul si está libre para arrastrar, gris si está bloqueado
-        lockBtn.style.color = 'white';
-        lockBtn.style.border = '1px solid white';
-        lockBtn.style.borderRadius = '50%';
-        lockBtn.style.width = '20px';
-        lockBtn.style.height = '20px';
-        lockBtn.style.fontSize = '9px';
-        lockBtn.style.cursor = 'pointer';
-        lockBtn.innerHTML = field.locked ? '<i class="fa-solid fa-lock"></i>' : '<i class="fa-solid fa-lock-open"></i>';
-        lockBtn.title = field.locked ? 'Desbloquear movimiento para arrastrar' : 'Bloquear movimiento';
-        
-        lockBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            field.locked = !field.locked;
-            
-            // Sincronizar UI del botón
-            lockBtn.style.backgroundColor = field.locked ? '#475569' : '#3b82f6';
-            lockBtn.innerHTML = field.locked ? '<i class="fa-solid fa-lock"></i>' : '<i class="fa-solid fa-lock-open"></i>';
-            lockBtn.title = field.locked ? 'Desbloquear movimiento para arrastrar' : 'Bloquear movimiento';
-            
-            const input = wrapper.querySelector('.editable-field-input');
-            if (field.locked) {
-                wrapper.classList.remove('dragging-enabled');
-                if (input) {
-                    input.style.pointerEvents = 'none';
-                    input.contentEditable = false;
-                }
-            } else {
-                wrapper.classList.add('dragging-enabled');
-                if (input) {
-                    input.style.pointerEvents = 'none';
-                    input.contentEditable = false;
-                }
-                // Quitar focos activos para preparar arrastre limpio
-                if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                }
-            }
         });
         
         controls.appendChild(formatBtn);
-        controls.appendChild(lockBtn); // Añadir botón de candado en el centro
+        controls.appendChild(editBtn);
+        controls.appendChild(moveBtn);
         controls.appendChild(deleteBtn);
         wrapper.appendChild(controls);
         
-        // Si el campo ya estaba desbloqueado (por ejemplo, tras re-renderizado), inyectar clase visual
+        // Sincronizar clase visual de arrastre si no está bloqueado
         if (!field.locked) {
             wrapper.classList.add('dragging-enabled');
         }
@@ -423,46 +451,6 @@ window.editorModule = (() => {
 
             // Ejecutar chequeo instantáneo de colisiones (throttleado)
             throttledCollisionDetection();
-        });
-
-        // DOBLE CLICK EN EL WRAPPER: Habilitar pointer-events, edición de texto y hacer foco (solo si está bloqueado)
-        wrapper.addEventListener('dblclick', (e) => {
-            if (field.locked === undefined) field.locked = true;
-            if (!field.locked) return; // Si no está bloqueado (modo drag activo), no editar texto
-            
-            e.stopPropagation();
-            input.style.pointerEvents = 'auto';
-            input.contentEditable = true;
-            input.focus();
-            
-            // Colocar el cursor al final del texto
-            const range = document.createRange();
-            range.selectNodeContents(input);
-            range.collapse(false);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-        });
-
-        // UN SOLO CLICK EN UN CAMPO YA SELECCIONADO: Habilitar pointer-events y edición al hacer clic de nuevo (solo si está bloqueado)
-        wrapper.addEventListener('click', (e) => {
-            if (field.locked === undefined) field.locked = true;
-            if (!field.locked) return; // Si no está bloqueado (modo drag activo), no editar texto
-            
-            if (wrapper.classList.contains('active-focus') && input.contentEditable !== 'true') {
-                e.stopPropagation();
-                input.style.pointerEvents = 'auto';
-                input.contentEditable = true;
-                input.focus();
-                
-                // Colocar el cursor al final del texto
-                const range = document.createRange();
-                range.selectNodeContents(input);
-                range.collapse(false);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
         });
 
         // ESCAPE: Desenfocar el campo de texto para guardar y bloquear de nuevo
@@ -757,10 +745,55 @@ window.editorModule = (() => {
         document.querySelectorAll('.temp-guide').forEach(g => g.remove());
     };
 
+    const clearAllSelections = () => {
+        console.log('[Editor] Limpiando todas las selecciones...');
+        document.querySelectorAll('.editable-field-wrapper').forEach(w => {
+            w.classList.remove('active-focus', 'dragging-enabled', 'is-writing');
+            const input = w.querySelector('.editable-field-input');
+            if (input) {
+                input.contentEditable = false;
+                input.style.pointerEvents = 'none';
+            }
+            const controls = w.querySelector('.quick-controls-wrapper');
+            if (controls) controls.remove();
+        });
+        
+        document.querySelectorAll('.draggable-stamp, .corrector-patch, .draggable-checkbox-wrapper').forEach(w => {
+            w.classList.remove('active-focus');
+        });
+        
+        // Bloquear todos los campos en el modelo
+        if (window.pdfFields) {
+            window.pdfFields.forEach(f => {
+                f.locked = true; // Volver a bloquear por defecto
+            });
+        }
+        
+        if (window.historyManager) {
+            window.historyManager.saveState();
+        }
+    };
+
+    // Escuchar clics en el fondo del PDF-overlay para deseleccionar y bloquear todo
+    document.addEventListener('DOMContentLoaded', () => {
+        const overlay = document.getElementById('pdf-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    const isFilling = window.fillToolsModule && window.fillToolsModule.getActiveTool && window.fillToolsModule.getActiveTool() !== 'none';
+                    if (!isFilling) {
+                        clearAllSelections();
+                    }
+                }
+            });
+        }
+    });
+
     // API pública del módulo
     return {
         initFieldsOverlay: initFieldsOverlay,
         runCollisionDetection: runCollisionDetection,
+        clearAllSelections: clearAllSelections,
         hasCollisions: () => collisions.size > 0,
         getCollisions: () => Array.from(collisions).map(id => {
             const f = activeFields.find(field => field.id === id);

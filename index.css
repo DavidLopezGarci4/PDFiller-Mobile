@@ -989,13 +989,13 @@ input:checked + .slider:before {
 /* CONTENEDOR DE ACCIONES RÁPIDAS (ELIMINAR + COPIAR FORMATO) */
 .quick-controls-wrapper {
     position: absolute;
-    top: -12px;
-    right: -24px;
+    top: -26px; /* Elevado sobre el cuadro de texto de forma premium */
+    left: 50%;
+    transform: translateX(-50%) scale(0.6);
     display: flex;
-    gap: 4px;
+    gap: 6px;
     z-index: 999;
     opacity: 0;
-    transform: scale(0.6);
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: auto;
 }
@@ -1013,7 +1013,11 @@ input:checked + .slider:before {
 .editable-field-wrapper:hover .quick-controls-wrapper,
 .editable-field-wrapper.active-focus .quick-controls-wrapper,
 .draggable-stamp:hover .quick-controls-wrapper,
-.draggable-stamp.active-focus .quick-controls-wrapper,
+.draggable-stamp.active-focus .quick-controls-wrapper {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
 .draggable-stamp:hover .btn-delete-element,
 .draggable-stamp.active-focus .btn-delete-element,
 .corrector-patch:hover .btn-delete-element,
@@ -1638,7 +1642,5 @@ body:not(.edit-mode-active) #conflict-banner {
 .editable-field-wrapper .editable-field-input:focus ~ .quick-controls-wrapper {
     opacity: 0 !important;
     pointer-events: none !important;
-    transform: scale(0.6) !important;
+    transform: translateX(-50%) scale(0.6) !important;
 }
-
-
