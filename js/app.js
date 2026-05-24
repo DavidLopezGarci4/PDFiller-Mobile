@@ -187,6 +187,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnUndo) btnUndo.addEventListener('click', () => window.historyManager.undo());
     if (btnRedo) btnRedo.addEventListener('click', () => window.historyManager.redo());
 
+    // Bind de Descartar en Cabecera
+    const btnDiscard = document.getElementById('btn-discard');
+    if (btnDiscard) {
+        btnDiscard.addEventListener('click', () => {
+            if (!window.pdfInstance) return;
+            const confirmDiscard = confirm("Si descartas el documento actual, perderás todos los cambios no guardados. ¿Deseas continuar?");
+            if (confirmDiscard) {
+                console.log('Descartando edición y volviendo a estado vacío...');
+                
+                // Limpiar variables globales
+                window.pdfInstance = null;
+                window.pdfBytes = null;
+                window.pdfFields = [];
+                window.pdfPageNum = 1;
+                
+                if (window.fillToolsModule) {
+                    window.fillToolsModule.setCorrectorPatches([]);
+                    window.fillToolsModule.setCheckboxes([]);
+                }
+                if (window.signaturesModule) {
+                    window.signaturesModule.setPlacedSignatures([]);
+                }
+                
+                // Limpiar DOM
+                const overlay = document.getElementById('pdf-overlay');
+                if (overlay) overlay.innerHTML = '';
+                
+                const pagesContainer = document.getElementById('pages-container');
+                if (pagesContainer) pagesContainer.innerHTML = '';
+                
+                // Resetear controles de zoom
+                window.pdfScale = 1.0;
+                const zoomSlider = document.getElementById('zoom-slider');
+                if (zoomSlider) zoomSlider.value = 100;
+                const zoomPercentage = document.getElementById('zoom-percentage');
+                if (zoomPercentage) zoomPercentage.textContent = '100%';
+                
+                // Ocultar viewport y mostrar estado vacío
+                const pdfViewport = document.getElementById('pdf-viewport');
+                const emptyState = document.getElementById('empty-state');
+                if (pdfViewport) pdfViewport.style.display = 'none';
+                if (emptyState) emptyState.style.display = 'flex';
+                
+                // Deshabilitar botones de guardar
+                if (btnSaveDraft) btnSaveDraft.disabled = true;
+                if (btnSavePdf) btnSavePdf.disabled = true;
+                
+                // Ocultar botón de descartar
+                btnDiscard.style.display = 'none';
+                
+                // Deshabilitar undo/redo
+                if (btnUndo) btnUndo.disabled = true;
+                if (btnRedo) btnRedo.disabled = true;
+                
+                // Limpiar input file
+                if (pdfUpload) pdfUpload.value = '';
+                
+                console.log('¡Edición descartada correctamente!');
+            }
+        });
+    }
+
     // Shortcuts de Teclado (Ctrl+Z y Ctrl+Y) + Movimiento de Flechas (Desktop Nudging) + Copy-Paste (Ctrl+C / Ctrl+V)
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key.toLowerCase() === 'z') {
@@ -421,14 +483,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Carga de archivo manual por el usuario
     pdfUpload.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file && file.type === 'application/pdf') {
-            loadingOverlay.classList.add('active');
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const bytes = new Uint8Array(event.target.result);
-                await loadPdfDocument(bytes, file.name);
-            };
-            reader.readAsArrayBuffer(file);
+        if (file) {
+            const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+            if (isPdf) {
+                loadingOverlay.classList.add('active');
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const bytes = new Uint8Array(event.target.result);
+                    await loadPdfDocument(bytes, file.name);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('El archivo seleccionado no parece ser un documento PDF válido.');
+            }
         }
     });
 
@@ -540,6 +607,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pdfViewport = document.getElementById('pdf-viewport');
             if (emptyState) emptyState.style.display = 'none';
             if (pdfViewport) pdfViewport.style.display = 'inline-block';
+
+            // Mostrar botón de descartar y habilitar botones de guardar
+            const btnDiscard = document.getElementById('btn-discard');
+            if (btnDiscard) btnDiscard.style.display = 'inline-flex';
+            if (btnSaveDraft) btnSaveDraft.disabled = false;
+            if (btnSavePdf) btnSavePdf.disabled = false;
 
             loadingOverlay.classList.remove('active');
             console.log('¡Documento cargado con éxito!');

@@ -35,8 +35,17 @@
         <!-- CABECERA SUPERIOR PREMIUM -->
         <header id="app-header">
             <div class="header-left">
-                <i class="fa-solid fa-file-pdf pdf-logo"></i>
-                <span class="app-title">PDFiller <span class="accent-text">2</span></span>
+                <div class="brand">
+                    <div class="logo-icon">
+                        <svg class="logo-svg" viewBox="-10 -10 268 332" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M40 0 H180 L240 60 V280 C240 297.7 225.7 312 208 312 H40 C22.3 312 8 297.7 8 280 V32 C8 14.3 22.3 0 40 0 Z" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round" />
+                            <path d="M180 0 V60 H240 Z" fill="currentColor" />
+                            <path d="M30 200 L160 70 C168.3 61.7 181.7 61.7 190 70 L210 90 C218.3 98.3 218.3 111.7 210 120 L80 250 L30 260 Z" fill="currentColor" />
+                            <path d="M40 230 C80 250, 160 210, 220 240" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <h1><span class="brand-name">PDF<span class="gradient-text">iller</span></span> <span class="mobile-badge">2</span></h1>
+                </div>
             </div>
             
             <!-- CONTROLES DESHACER / REHACER (HISTORIAL) -->
@@ -58,15 +67,18 @@
                     <span id="zoom-percentage" style="font-size: 11px; font-weight: 600; font-family: monospace; min-width: 35px; text-align: right; color: var(--text-secondary);">100%</span>
                 </div>
 
-                <label for="pdf-upload" class="btn btn-secondary btn-icon-only" title="Cargar nuevo PDF">
-                    <i class="fa-solid fa-file-arrow-up"></i>
-                </label>
+                <!-- Botón de Descartar Edición -->
+                <button id="btn-discard" class="btn btn-secondary btn-icon-only" title="Descartar edición actual" style="display: none;">
+                    <i class="fa-solid fa-xmark" style="color: #ef4444; font-size: 13px; font-weight: 700;"></i>
+                </button>
+
+                <!-- Input oculto para carga de documentos -->
                 <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
                 
-                <button id="btn-save-draft" class="btn btn-secondary" title="Guardar borrador de progreso localmente">
+                <button id="btn-save-draft" class="btn btn-secondary" title="Guardar borrador de progreso localmente" disabled>
                     <i class="fa-solid fa-file-signature"></i> <span>Guardar</span>
                 </button>
-                <button id="btn-save-pdf" class="btn btn-primary" title="Exportar como PDF final con nombre personalizado">
+                <button id="btn-save-pdf" class="btn btn-primary" title="Exportar como PDF final" disabled>
                     <i class="fa-solid fa-floppy-disk"></i> <span>Guardar como</span>
                 </button>
             </div>
