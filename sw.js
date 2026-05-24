@@ -1,18 +1,26 @@
-const CACHE_NAME = 'pdfiller-mobile-v5';
+const CACHE_NAME = 'pdfiller-mobile-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './index.css',
   './manifest.json',
   './icon.svg',
+  './assets/sample_invoice.pdf',
+  './js/app.js',
+  './js/core/pdf_render.js',
+  './js/core/text_parser.js',
+  './js/modules/editor.js',
+  './js/modules/fill_tools.js',
+  './js/modules/signatures.js',
+  './js/modules/export.js',
+  './js/utils/gestures.js',
   // CDN Libraries for offline execution
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-  'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.0/dist/pdf-lib.min.js',
-  'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
+  'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+  'https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Quicksand:wght@400;500;700&display=swap'
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap'
 ];
 
 // Install Event

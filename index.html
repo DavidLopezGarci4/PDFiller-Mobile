@@ -1,483 +1,372 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <!-- Viewport configured for touch apps: disables double-tap zoom for high responsiveness -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>PDFiller Mobile - Rellenador y Firmador PWA</title>
-  
-  <!-- SEO & PWA Meta Tags -->
-  <meta name="description" content="Rellena y firma PDFs en tu móvil usando tu dedo o S Pen de forma local, segura y rápida.">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon.svg">
-
-  <!-- Google Fonts: Outfit, Inter & Quicksand -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Quicksand:wght@400;500;700&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Mobile Specific CSS -->
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDFiller 2 - Editor de PDF Móvil Responsive</title>
+    <!-- Configuración PWA / WPA para Móviles -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#090d16">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para iconos limpios -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Estilos Premium Personalizados -->
+    <link rel="stylesheet" href="index.css?v=2.4">
+    <!-- PDF.js para renderizado de PDF en cliente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- pdf-lib para guardar y compilar cambios en cliente -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- interact.js para drag-and-drop robusto en móviles -->
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 </head>
-<body>
+<body class="edit-mode-active">
 
-  <!-- App Wrapper -->
-  <div id="app-container" class="app-layout">
-    
-    <!-- Top Action Bar (Header) -->
-    <header class="app-header">
-      <div class="brand">
-        <div class="logo-icon">
-          <svg class="logo-svg" viewBox="-10 -10 268 332" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M40 0 H180 L240 60 V280 C240 297.7 225.7 312 208 312 H40 C22.3 312 8 297.7 8 280 V32 C8 14.3 22.3 0 40 0 Z" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round" />
-            <path d="M180 0 V60 H240 Z" fill="currentColor" />
-            <path d="M30 200 L160 70 C168.3 61.7 181.7 61.7 190 70 L210 90 C218.3 98.3 218.3 111.7 210 120 L80 250 L30 260 Z" fill="currentColor" />
-            <path d="M40 230 C80 250, 160 210, 220 240" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" />
-          </svg>
-        </div>
-        <h1><span class="brand-name">PDF<span class="gradient-text">iller</span></span> <span class="mobile-badge">Mobile</span></h1>
-      </div>
-      <div class="header-actions" style="display: flex; gap: 6px; align-items: center;">
-        <button id="btn-undo-header" class="btn-circle btn-secondary" disabled title="Deshacer" style="width: 32px; height: 32px; font-size: 11px;">
-          <i class="fa-solid fa-arrow-rotate-left"></i>
-        </button>
-        <button id="btn-redo-header" class="btn-circle btn-secondary" disabled title="Rehacer" style="width: 32px; height: 32px; font-size: 11px;">
-          <i class="fa-solid fa-arrow-rotate-right"></i>
-        </button>
-        <button id="btn-delete-header" class="btn-circle btn-danger" disabled title="Eliminar seleccionado" style="width: 32px; height: 32px; font-size: 11px;">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-        <div style="width: 1px; height: 20px; background: var(--border-light); margin: 0 2px;"></div>
-        <!-- Quick Action: Export / Download -->
-        <button id="btn-save-final-quick" class="btn-circle btn-primary" title="Guardar PDF Como...">
-          <i class="fa-solid fa-file-export"></i>
-        </button>
-      </div>
-    </header>
-    
-    <!-- Editor Canvas Area -->
-    <main class="editor-area">
-      <!-- Drag and Drop Overlay / Loading Mobile Welcome -->
-      <div id="drop-zone" class="drop-zone active">
-        <div class="drop-zone-content">
-          <div class="upload-icon-wrapper">
-            <i class="fa-solid fa-file-pdf upload-icon animate-bounce"></i>
-          </div>
-          <h2>Rellena y firma PDFs en tu móvil</h2>
-          <p>Selecciona tu archivo PDF local para comenzar</p>
-          <button id="btn-browse-file" class="btn btn-accent btn-lg btn-full">
-            <i class="fa-solid fa-folder-open"></i> <span>Abrir PDF</span>
-          </button>
-          <input type="file" id="file-input" accept="application/pdf" style="display: none;">
-        </div>
-      </div>
-      
-      <!-- Viewer Viewport -->
-      <div id="viewer-container" class="viewer-container hidden">
-        <div id="zoom-content-wrapper" class="zoom-content-wrapper">
-          <!-- Dynamic pages render here -->
-        </div>
-      </div>
-    </main>
-
-    <!-- Bottom Navigation Bar (App-Style) -->
-    <nav class="bottom-nav">
-      <button id="nav-btn-doc" class="nav-item" data-drawer="drawer-doc">
-        <i class="fa-solid fa-file-pdf"></i>
-        <span>Documento</span>
-      </button>
-      <button id="nav-btn-text" class="nav-item" data-drawer="drawer-text">
-        <i class="fa-solid fa-font"></i>
-        <span>Texto</span>
-      </button>
-      <button id="nav-btn-signature" class="nav-item" data-drawer="drawer-sig">
-        <i class="fa-solid fa-pen-nib"></i>
-        <span>Firmar</span>
-      </button>
-      <button id="nav-btn-corrector" class="nav-item" data-drawer="drawer-corr">
-        <i class="fa-solid fa-eraser"></i>
-        <span>Corrector</span>
-      </button>
-      <button id="nav-btn-icon" class="nav-item" data-drawer="drawer-icon">
-        <i class="fa-solid fa-circle-check"></i>
-        <span>Iconos</span>
-      </button>
-    </nav>
-
-    <!-- Bottom Sliding Drawers (Configuration Panels) -->
-    <div class="drawer-overlay" id="drawer-overlay"></div>
-
-    <!-- Drawer: Document Settings -->
-    <div class="bottom-drawer" id="drawer-doc">
-      <div class="drawer-header">
-        <div class="drawer-handle"></div>
-        <h3>Gestión de Documento</h3>
-        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="drawer-body">
-        <div class="document-info">
-          <div class="info-row">
-            <span class="info-label">Archivo:</span>
-            <span class="info-value" id="doc-filename">- Ninguno -</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Páginas:</span>
-            <span class="info-value" id="doc-page-count">-</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Elementos:</span>
-            <span class="info-value" id="doc-element-count">0</span>
-          </div>
-        </div>
-        <div class="action-grid-full">
-          <button id="btn-load-new" class="btn btn-secondary btn-full">
-            <i class="fa-solid fa-folder-open text-primary"></i> <span>Abrir otro PDF</span>
-          </button>
-          <button id="btn-save-current" class="btn btn-secondary btn-full">
-            <i class="fa-solid fa-floppy-disk text-primary"></i> <span>Guardar progreso</span>
-          </button>
-          <button id="btn-save-as" class="btn btn-primary btn-full">
-            <i class="fa-solid fa-file-export"></i> <span>Guardar como...</span>
-          </button>
-        </div>
-        <div class="sidebar-action-grid" style="margin-top: 15px;">
-          <button id="btn-undo" class="btn btn-secondary btn-sm" disabled>
-            <i class="fa-solid fa-undo"></i> Deshacer
-          </button>
-          <button id="btn-redo" class="btn btn-secondary btn-sm" disabled>
-            <i class="fa-solid fa-redo"></i> Rehacer
-          </button>
-        </div>
-        <button id="btn-clear-all" class="btn btn-danger btn-sm btn-full" style="margin-top: 10px;" disabled>
-          <i class="fa-solid fa-trash-can"></i> Limpiar todo el PDF
-        </button>
-        <button id="btn-clear-user-data" class="btn btn-danger btn-sm btn-full" style="margin-top: 10px;">
-          <i class="fa-solid fa-user-slash"></i> Cerrar sesión y limpiar datos locales
-        </button>
-      </div>
+    <!-- DIAGNOSTIC HUD OVERLAY FOR FULL SYSTEM VISIBILITY -->
+    <div id="debug-hud" style="position: fixed; top: 12px; left: 12px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border: 1.5px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 10px 16px; border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 11px; z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; display: flex; gap: 16px; align-items: center; font-weight: 500; transition: all 0.3s ease;">
+        <div style="display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-gauge-high" style="color: #3b82f6; font-size: 13px;"></i> <span style="font-weight: 700; color: #f8fafc; text-transform: uppercase; letter-spacing: 0.5px;">HUD Diagnóstico</span></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+        <div>Escala: <span id="hud-scale" style="color: #f8fafc; font-weight: 700; font-family: monospace;">-</span></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+        <div>Campos: <span id="hud-fields" style="color: #f8fafc; font-weight: 700; font-family: monospace;">-</span></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+        <div>DOM Wrappers: <span id="hud-wrappers" style="color: #f8fafc; font-weight: 700; font-family: monospace;">-</span></div>
+        <div style="width: 1px; height: 14px; background: rgba(255,255,255,0.15);"></div>
+        <div>Coordenadas: <span id="hud-coords" style="color: #f8fafc; font-weight: 700; font-family: monospace;">-</span></div>
     </div>
 
-    <!-- Drawer: Text settings -->
-    <div class="bottom-drawer" id="drawer-text">
-      <div class="drawer-header">
-        <div class="drawer-handle"></div>
-        <h3>Propiedades de Texto</h3>
-        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="drawer-body">
-        <div class="tool-info-bar">
-          <p><i class="fa-solid fa-circle-info text-accent"></i> Toca cualquier parte del PDF para agregar texto.</p>
-        </div>
-        <!-- Font Selection -->
-        <div class="control-group">
-          <label><i class="fa-solid fa-font"></i> Tipografía</label>
-          <div class="select-wrapper">
-            <select id="font-family-select">
-              <option value="Calibri" style="font-family: Calibri, sans-serif;">Calibri</option>
-              <option value="Verdana" style="font-family: Verdana, sans-serif;">Verdana</option>
-              <option value="Arial" style="font-family: Arial, sans-serif;">Arial</option>
-              <option value="Helvetica" style="font-family: Helvetica, Arial, sans-serif;">Helvetica</option>
-              <option value="Times New Roman" style="font-family: 'Times New Roman', serif;">Times New Roman</option>
-              <option value="Courier New" style="font-family: 'Courier New', monospace;">Courier New</option>
-              <option value="Quicksand" style="font-family: 'Quicksand', sans-serif;">Quicksand</option>
-            </select>
-            <i class="fa-solid fa-chevron-down select-arrow"></i>
-          </div>
-        </div>
-        <!-- Font Size -->
-        <div class="control-group" style="margin-top: 12px;">
-          <label><i class="fa-solid fa-text-height"></i> Tamaño (<span id="font-size-val">12</span>px)</label>
-          <input type="range" id="font-size-range" min="8" max="40" value="12">
-          <div class="size-presets">
-            <button class="preset-btn" data-size="8">Pq</button>
-            <button class="preset-btn active" data-size="12">Md</button>
-            <button class="preset-btn" data-size="16">Gd</button>
-            <button class="preset-btn" data-size="20">Xl</button>
-          </div>
-        </div>
-        <!-- Font Color -->
-        <div class="control-group" style="margin-top: 12px;">
-          <label><i class="fa-solid fa-palette"></i> Color de letra</label>
-          <div class="color-palette">
-            <button class="color-swatch active" data-color="#000000" style="background-color: #000000;"></button>
-            <button class="color-swatch" data-color="#1e3a8a" style="background-color: #1e3a8a;"></button>
-            <button class="color-swatch" data-color="#b91c1c" style="background-color: #b91c1c;"></button>
-            <button class="color-swatch" data-color="#047857" style="background-color: #047857;"></button>
-            <button class="color-swatch" data-color="#4b5563" style="background-color: #4b5563;"></button>
-            <div class="custom-color-wrapper">
-              <input type="color" id="custom-color-picker" value="#000000">
-              <i class="fa-solid fa-eye-dropper custom-color-icon"></i>
+    <!-- Contenedor Principal de la App -->
+    <div id="app-container">
+        
+        <!-- CABECERA SUPERIOR PREMIUM -->
+        <header id="app-header">
+            <div class="header-left">
+                <i class="fa-solid fa-file-pdf pdf-logo"></i>
+                <span class="app-title">PDFiller <span class="accent-text">2</span></span>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Drawer: Signature Gallery & Creator -->
-    <div class="bottom-drawer" id="drawer-sig">
-      <div class="drawer-header">
-        <div class="drawer-handle"></div>
-        <h3>Galería de Firmas</h3>
-        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="drawer-body">
-        <div class="tool-info-bar">
-          <p><i class="fa-solid fa-circle-info text-accent"></i> Selecciona una firma de abajo y pulsa en el PDF para colocarla.</p>
-        </div>
-        <button id="btn-create-sig" class="btn btn-accent btn-full" style="margin-bottom: 12px;">
-          <i class="fa-solid fa-signature"></i> <span>Crear Nueva Firma / S Pen</span>
-        </button>
-        <!-- Signature list -->
-        <div class="signature-library-wrapper">
-          <p class="library-empty" id="sig-library-empty">No hay firmas creadas aún. Haz clic arriba para crear una.</p>
-          <div class="signature-grid" id="signature-grid-list">
-            <!-- Dynamic items -->
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Drawer: Corrector Intelligent Settings -->
-    <div class="bottom-drawer" id="drawer-corr">
-      <div class="drawer-header">
-        <div class="drawer-handle"></div>
-        <h3>Herramienta Corrector</h3>
-        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="drawer-body">
-        <div class="tool-info-bar">
-          <p><i class="fa-solid fa-eraser text-primary"></i> **Borrador inteligente**: Arrastra tu dedo o lápiz sobre cualquier área del PDF. Detectará automáticamente el color del fondo y la cubrirá con un parche corrector perfecto.</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Drawer: Icons Customization Options -->
-    <div class="bottom-drawer" id="drawer-icon">
-      <div class="drawer-header">
-        <div class="drawer-handle"></div>
-        <h3>Opciones de Iconos</h3>
-        <button class="drawer-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="drawer-body">
-        <div class="tool-info-bar">
-          <p><i class="fa-solid fa-circle-check text-accent"></i> **Validación rápida**: Elige un icono y toca el PDF para colocarlo. ¡Snapping inteligente lo centrará en la casilla!</p>
-        </div>
-        
-        <div class="control-group">
-          <label><i class="fa-solid fa-icons"></i> Tipo de Icono</label>
-          <div class="icon-selector-grid">
-            <button class="icon-option-btn active" data-icon-type="tick">
-              <i class="fa-solid fa-check"></i> <span>Tick (✓)</span>
-            </button>
-            <button class="icon-option-btn" data-icon-type="cross-sym">
-              <i class="fa-solid fa-x"></i> <span>Cruz S. (X)</span>
-            </button>
-            <button class="icon-option-btn" data-icon-type="cross-est">
-              <i class="fa-solid fa-xmark"></i> <span>Cruz E. (✗)</span>
-            </button>
-            <button class="icon-option-btn" data-icon-type="dot">
-              <i class="fa-solid fa-circle"></i> <span>Punto (●)</span>
-            </button>
-          </div>
-        </div>
-        
-        <div class="control-group" style="margin-top: 12px;">
-          <label for="icon-size-input"><i class="fa-solid fa-maximize"></i> Tamaño (<span id="icon-size-val">20</span>px)</label>
-          <input type="range" id="icon-size-input" min="12" max="36" value="20" step="1">
-        </div>
-        
-        <div class="control-group" style="margin-top: 12px;">
-          <label><i class="fa-solid fa-palette"></i> Color del Icono</label>
-          <div class="color-palette" id="icon-color-palette">
-            <button class="color-swatch active" data-color="#000000" style="background-color: #000000;" title="Negro"></button>
-            <button class="color-swatch" data-color="#1d4ed8" style="background-color: #1d4ed8;" title="Azul"></button>
-            <button class="color-swatch" data-color="#b91c1c" style="background-color: #b91c1c;" title="Rojo"></button>
-            <button class="color-swatch" data-color="#047857" style="background-color: #047857;" title="Verde"></button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Session Restore Toast -->
-  <div id="restore-toast" class="toast hidden">
-    <div class="toast-content">
-      <i class="fa-solid fa-clock-rotate-left toast-icon"></i>
-      <div class="toast-body">
-        <h4>Progreso guardado encontrado</h4>
-        <p>¿Quieres recuperar tu última edición en el documento <strong id="restore-filename"></strong>?</p>
-      </div>
-      <div class="toast-actions">
-        <button id="btn-restore-cancel" class="btn btn-sm btn-secondary">Descartar</button>
-        <button id="btn-restore-confirm" class="btn btn-sm btn-accent">Restaurar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Signature Creator Modal (Stylus / S Pen Optimized) -->
-  <div id="sig-modal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Crear Firma con Precisión</h3>
-        <button class="modal-close" id="btn-close-sig-modal"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-tabs">
-        <button class="tab-btn active" data-tab="tab-draw">
-          <i class="fa-solid fa-pen-fancy"></i> Dibujar / S Pen
-        </button>
-        <button class="tab-btn" data-tab="tab-upload">
-          <i class="fa-solid fa-image"></i> Importar Firma
-        </button>
-      </div>
-      
-      <!-- Tab 1: Draw Signature with Stylus Pressure Sensitivity -->
-      <div id="tab-draw" class="tab-content active">
-        <div class="draw-controls">
-          <div class="brush-settings">
-            <span class="control-label">Color:</span>
-            <div class="brush-colors">
-              <button class="brush-color active" data-color="#000000" style="background-color: #000000;"></button>
-              <button class="brush-color" data-color="#1e3a8a" style="background-color: #1e3a8a;"></button>
-              <button class="brush-color" data-color="#b91c1c" style="background-color: #b91c1c;"></button>
+            
+            <!-- CONTROLES DESHACER / REHACER (HISTORIAL) -->
+            <div class="header-center" style="display: flex; gap: 8px;">
+                <button id="btn-undo" class="btn btn-secondary btn-icon-only" title="Deshacer (Ctrl+Z)" disabled>
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button id="btn-redo" class="btn btn-secondary btn-icon-only" title="Rehacer (Ctrl+Y)" disabled>
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
             </div>
-            <span class="control-label gap-left">Grosor Base:</span>
-            <input type="range" id="brush-thickness" min="1" max="6" value="3">
-          </div>
-          <button class="btn btn-secondary btn-sm" id="btn-clear-sig-pad">
-            <i class="fa-solid fa-eraser"></i> Borrar lienzo
-          </button>
-        </div>
-        
-        <!-- S Pen / Precision Drawing area -->
-        <div class="signature-pad-container">
-          <!-- Canvas sized relative to viewport -->
-          <canvas id="signature-pad" width="340" height="240"></canvas>
-        </div>
-        <div class="stylus-info-tip">
-          <p><i class="fa-solid fa-pen-nib"></i> **Optimizado para S Pen**: Ejerce más o menos presión para variar de forma dinámica el grosor del trazo.</p>
-        </div>
-      </div>
-      
-      <!-- Tab 2: Upload Image Signature -->
-      <div id="tab-upload" class="tab-content">
-        <div class="image-upload-zone" id="img-sig-dropzone">
-          <div class="upload-zone-prompt" id="img-sig-prompt">
-            <i class="fa-solid fa-images upload-img-icon"></i>
-            <p>Arrastra tu firma PNG/JPG o haz clic para subir</p>
-            <button class="btn btn-secondary btn-sm" id="btn-browse-img-sig">Examinar</button>
-            <input type="file" id="img-sig-input" accept="image/png, image/jpeg, image/jpg" style="display: none;">
-          </div>
-          <div class="image-preview-container hidden" id="img-sig-preview-wrapper">
-            <img id="img-sig-preview" src="" alt="Firma importada">
-            <button class="btn-remove-preview" id="btn-remove-img-sig" title="Quitar imagen"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>
-        
-        <div class="signature-options">
-          <label class="checkbox-container">
-            <input type="checkbox" id="chk-remove-bg" checked>
-            <span class="checkmark"></span>
-            Eliminar fondo blanco (Hacer transparente)
-          </label>
-        </div>
-      </div>
-      
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="btn-cancel-sig">Cancelar</button>
-        <button class="btn btn-accent" id="btn-save-sig" disabled>Guardar Firma</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- "Guardar Como" File Name Modal -->
-  <div id="save-as-modal" class="modal-overlay hidden">
-    <div class="modal-card modal-sm">
-      <div class="modal-header">
-        <h3>Guardar PDF Como</h3>
-        <button class="modal-close" id="btn-close-save-modal"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="control-group">
-          <label for="save-filename-input">Nombre del Archivo</label>
-          <div class="input-with-addon">
-            <input type="text" id="save-filename-input" placeholder="nombre-del-archivo">
-            <span class="input-addon">.pdf</span>
-          </div>
+            <div class="header-right">
+                <!-- CONTROLES DE ZOOM PREMIUM (OCULTOS EN MÓVILES) -->
+                <div class="header-zoom-controls" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 20px; margin-right: 8px;">
+                    <button id="btn-zoom-out" class="btn btn-secondary btn-icon-only btn-sm" title="Alejar (Zoom Out)" style="padding: 4px 6px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-minus" style="font-size: 10px;"></i></button>
+                    <input type="range" id="zoom-slider" min="50" max="250" value="100" style="width: 80px; accent-color: var(--accent); cursor: pointer; height: 4px; border-radius: 2px;">
+                    <button id="btn-zoom-in" class="btn btn-secondary btn-icon-only btn-sm" title="Acercar (Zoom In)" style="padding: 4px 6px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-plus" style="font-size: 10px;"></i></button>
+                    <span id="zoom-percentage" style="font-size: 11px; font-weight: 600; font-family: monospace; min-width: 35px; text-align: right; color: var(--text-secondary);">100%</span>
+                </div>
+
+                <label for="pdf-upload" class="btn btn-secondary btn-icon-only" title="Cargar nuevo PDF">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                </label>
+                <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
+                
+                <button id="btn-save-draft" class="btn btn-secondary" title="Guardar borrador de progreso localmente">
+                    <i class="fa-solid fa-file-signature"></i> <span>Guardar</span>
+                </button>
+                <button id="btn-save-pdf" class="btn btn-primary" title="Exportar como PDF final con nombre personalizado">
+                    <i class="fa-solid fa-floppy-disk"></i> <span>Guardar como</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- BANNER DE CONFLICTOS INSTANTÁNEO -->
+        <div id="conflict-banner" class="hidden-banner">
+            <div class="banner-content">
+                <i class="fa-solid fa-circle-exclamation banner-icon"></i>
+                <span id="conflict-message">Conflicto visual detectado</span>
+            </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="btn-cancel-save">Cancelar</button>
-        <button class="btn btn-primary" id="btn-confirm-save">Exportar PDF</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="modal-overlay hidden bg-dark-opaque">
-    <div class="spinner-container">
-      <div class="spinner"></div>
-      <p id="loading-text">Cargando PDF...</p>
-    </div>
-  </div>
+        <!-- ÁREA DE TRABAJO (CANVAS DE PDF + CAPA INTERACTIVA) -->
+        <main id="workspace-container">
+            <div id="pdf-scroller">
+                <div id="pdf-viewport">
+                    <!-- Canvas donde PDF.js dibuja el PDF real -->
+                    <canvas id="pdf-canvas"></canvas>
+                    
+                    <!-- Capa de superposición HTML (Overlay) donde ocurren las interacciones -->
+                    <div id="pdf-overlay"></div>
+                </div>
+            </div>
 
-  <!-- PDF.js CDN Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  </script>
+            <!-- BARRA LATERAL DERECHA DE PÁGINAS PREMIUM -->
+            <aside id="page-sidebar" class="page-sidebar">
+                <div class="sidebar-header">
+                    <h4>Páginas</h4>
+                </div>
+                <div id="pages-container" class="pages-list">
+                    <!-- Miniaturas de página cargadas dinámicamente -->
+                </div>
+            </aside>
 
-  <!-- PDF-lib and Fontkit CDN Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.0/dist/pdf-lib.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+            <!-- CÁPSULA FLOTANTE DE PAGINACIÓN -->
+            <div id="floating-pagination" class="floating-pagination">
+                <button id="btn-prev-page" class="btn btn-secondary btn-icon-only btn-sm" title="Página Anterior">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="pagination-info">
+                    <span>Pág.</span>
+                    <select id="select-page-num" class="premium-select-page">
+                        <option value="1">1</option>
+                    </select>
+                    <span>de <span id="total-pages-span">1</span></span>
+                </div>
+                <button id="btn-next-page" class="btn btn-secondary btn-icon-only btn-sm" title="Siguiente Página">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
 
-  <!-- Service Worker PWA Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        // Use a cache-busting query to bypass aggressive HTTP cache for the registration script
-        navigator.serviceWorker.register('sw.js?v=5')
-          .then(reg => {
-            console.log('Service Worker registrado correctamente.', reg.scope);
+            <!-- Indicador de Carga / Spinner -->
+            <div id="loading-overlay" class="active">
+                <div class="spinner"></div>
+                <p>Cargando documento...</p>
+            </div>
+        </main>
+
+        <!-- BARRA DE HERRAMIENTAS INFERIOR MÓVIL (TABS & TOOLS) -->
+        <footer id="app-toolbar">
             
-            // Check for updates every 30 minutes in the background
-            setInterval(() => {
-              reg.update();
-            }, 30 * 60 * 1000);
-            
-            reg.onupdatefound = () => {
-              const installingWorker = reg.installing;
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    console.log('Nueva actualización detectada en segundo plano.');
-                  }
-                }
-              };
-            };
-          })
-          .catch(err => console.warn('Fallo en el registro del Service Worker.', err));
-      });
+            <!-- CONTENIDO DE TABS INFERIORES -->
+            <div id="toolbar-panels">
+                
+                <!-- Panel 1: Editar (Dropdown de campos detectados) -->
+                <div id="panel-editar" class="toolbar-panel active">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-pen-to-square"></i> Campos Detectados</h3>
+                        <div class="toggle-container">
+                            <span class="toggle-label">Editar todos</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-edit-mode" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="select-wrapper">
+                            <select id="fields-dropdown" class="premium-select">
+                                <option value="" disabled selected>Selecciona un campo para editar...</option>
+                                <!-- Se rellena dinámicamente -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
-      // Handle controllerchange event to reload the page when the new Service Worker takes over (skipWaiting)
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          console.log('Nuevo Service Worker activado. Recargando para aplicar cambios...');
-          window.location.reload();
+                <!-- Panel 2: Rellenar (Texto, Icono, Corrector) -->
+                <div id="panel-rellenar" class="toolbar-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-fill-drip"></i> Herramientas de Relleno</h3>
+                    </div>
+                    <div class="panel-body flex-row">
+                        <button id="tool-text" class="tool-btn">
+                            <i class="fa-solid fa-font"></i>
+                            <span>Texto</span>
+                        </button>
+                        <button id="tool-corrector" class="tool-btn">
+                            <i class="fa-solid fa-eraser"></i>
+                            <span>Corrector</span>
+                        </button>
+                        <button id="tool-casilla" class="tool-btn">
+                            <i class="fa-regular fa-square-check"></i>
+                            <span>Casilla</span>
+                        </button>
+                    </div>
+                    
+                    <!-- AJUSTES DINÁMICOS DE RELLENADO -->
+                    <div id="fill-tool-settings" class="tool-settings-bar" style="display: none; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);">
+                        
+                        <!-- Ajustes de Texto -->
+                        <div id="text-tool-options" class="settings-subgroup" style="display: none;">
+                            <div class="settings-row" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span class="settings-label" style="font-size: 11px; color: var(--text-secondary);">Color:</span>
+                                    <div class="color-palette" id="text-color-palette" style="display: flex; gap: 6px;">
+                                        <button class="color-swatch active" data-color="auto" title="Automático según la sección del PDF" style="width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed var(--accent); background: transparent; color: var(--accent); font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;">A</button>
+                                        <button class="color-swatch" data-color="#0f172a" style="background-color: #0f172a; border: 1.5px solid #ffffff; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#2563eb" style="background-color: #2563eb; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#ef4444" style="background-color: #ef4444; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#ffffff" style="background-color: #ffffff; border: 1.5px solid #cbd5e1; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span class="settings-label" style="font-size: 11px; color: var(--text-secondary);">Tamaño:</span>
+                                    <div class="size-presets" id="text-size-presets" style="display: flex; gap: 6px;">
+                                        <button class="size-btn active" data-size="auto" style="padding: 3px 8px; font-size: 10px; border-radius: 6px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; cursor: pointer;">Auto</button>
+                                        <button class="size-btn" data-size="10" style="padding: 3px 8px; font-size: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--text-primary); cursor: pointer;">Peq.</button>
+                                        <button class="size-btn" data-size="12" style="padding: 3px 8px; font-size: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--text-primary); cursor: pointer;">Medio</button>
+                                        <button class="size-btn" data-size="16" style="padding: 3px 8px; font-size: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--text-primary); cursor: pointer;">Grande</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Ajustes de Icono -->
+
+                        
+                        <!-- Ajustes de Casilla -->
+                        <div id="casilla-tool-options" class="settings-subgroup" style="display: none;">
+                            <div class="settings-row" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <span class="settings-label" style="font-size: 11px; color: var(--text-secondary);">Símbolo Relleno:</span>
+                                    <div class="select-wrapper" style="flex: 1; max-width: 140px; position: relative;">
+                                        <select id="casilla-symbol-select" class="premium-select" style="padding: 4px 10px; font-size: 10px; border-radius: 6px;">
+                                            <option value="x" selected>Cruz / X (❌)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="display: none; align-items: center; justify-content: space-between;">
+                                    <span class="settings-label" style="font-size: 11px; color: var(--text-secondary);">Color Símbolo:</span>
+                                    <div class="color-palette" id="casilla-color-palette" style="display: flex; gap: 6px;">
+                                        <button class="color-swatch active" data-color="#0f172a" style="background-color: #0f172a; border: 1.5px solid #ffffff; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#3b82f6" style="background-color: #3b82f6; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#10b981" style="background-color: #10b981; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                        <button class="color-swatch" data-color="#ef4444" style="background-color: #ef4444; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;"></button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Firmas -->
+                <div id="panel-firmas" class="toolbar-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-signature"></i> Firmas Guardadas</h3>
+                        <button id="btn-open-signature-pad" class="btn btn-secondary btn-sm">
+                            <i class="fa-solid fa-plus"></i> Nueva Firma
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div id="signatures-list" class="carousel-signatures">
+                            <div class="no-signatures">No hay firmas guardadas. ¡Crea una nueva!</div>
+                            <!-- Firmas guardadas aparecerán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAVEGACIÓN DE PESTAÑAS (TABS BOTTOM BAR) -->
+            <nav id="app-tabs">
+                <button class="tab-link active" data-target="panel-editar">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Editar</span>
+                </button>
+                <button class="tab-link" data-target="panel-rellenar">
+                    <i class="fa-solid fa-fill-drip"></i>
+                    <span>Rellenar</span>
+                </button>
+                <button class="tab-link" data-target="panel-firmas">
+                    <i class="fa-solid fa-signature"></i>
+                    <span>Firmas</span>
+                </button>
+            </nav>
+        </footer>
+
+        <!-- MODAL DIBUJAR NUEVA FIRMA -->
+        <div id="signature-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Crear Nueva Firma</h2>
+                    <button class="modal-close" id="btn-close-sig-modal"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-info" style="margin-bottom: 8px;">Dibuja tu firma con el dedo o puntero dentro del recuadro.</p>
+                    
+                    <!-- Gama de colores para tinta de firma -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 11px; color: var(--text-secondary); font-weight: 500;">Color de Tinta:</span>
+                        <div class="color-palette" id="sig-color-palette" style="display: flex; gap: 8px;">
+                            <button class="color-swatch active" data-color="#0f172a" style="background-color: #0f172a; border: 1.5px solid #ffffff; width: 20px; height: 20px; border-radius: 50%; cursor: pointer;"></button>
+                            <button class="color-swatch" data-color="#2563eb" style="background-color: #2563eb; width: 20px; height: 20px; border-radius: 50%; cursor: pointer;"></button>
+                            <button class="color-swatch" data-color="#dc2626" style="background-color: #dc2626; width: 20px; height: 20px; border-radius: 50%; cursor: pointer;"></button>
+                            <button class="color-swatch" data-color="#16a34a" style="background-color: #16a34a; width: 20px; height: 20px; border-radius: 50%; cursor: pointer;"></button>
+                        </div>
+                    </div>
+                    
+                    <div class="canvas-sig-wrapper">
+                        <canvas id="signature-canvas"></canvas>
+                    </div>
+                    
+                    <!-- Subir imagen con eliminación de fondo -->
+                    <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+                        <span style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 6px; font-weight: 500;">O sube una imagen de tu firma (JPG/PNG):</span>
+                        <label for="sig-image-upload" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; cursor: pointer; height: 32px; border-radius: 8px;">
+                            <i class="fa-solid fa-file-image" style="color: #a855f7;"></i> Subir Foto de Firma
+                        </label>
+                        <input type="file" id="sig-image-upload" accept="image/png, image/jpeg" style="display: none;">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-clear-sig" class="btn btn-secondary"><i class="fa-solid fa-trash"></i> Limpiar</button>
+                    <button id="btn-save-sig" class="btn btn-primary"><i class="fa-solid fa-check"></i> Guardar Firma</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DIÁLOGO ADVERTENCIA DE SOLAPAMIENTO (GUARDAR COMO) -->
+        <div id="save-warning-banner" class="modal-overlay">
+            <div class="modal-content warning-content">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-triangle-exclamation warning-icon"></i> Advertencia de Diseño</h2>
+                </div>
+                <div class="modal-body">
+                    <p><strong>¡Atención!</strong> Se han detectado algunos campos de texto que se solapan o colisionan entre sí debido a que excedieron su tamaño original:</p>
+                    <ul id="collision-list-summary">
+                        <!-- Se llena con la lista de colisiones -->
+                    </ul>
+                    <p class="warning-detail">Si exportas ahora, los textos aparecerán empalmados o superpuestos en el PDF descargado. ¿Deseas continuar de todos modos?</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-cancel-save" class="btn btn-secondary">Ajustar Campos</button>
+                    <button id="btn-force-save" class="btn btn-danger">Exportar de todos modos</button>
+                </div>
+            </div>
+        </div>
+
+
+
+    </div>
+
+    <!-- Cargar Scripts de la Aplicación -->
+    <script src="js/core/pdf_render.js?v=2.4"></script>
+    <script src="js/core/text_parser.js?v=2.4"></script>
+    <script src="js/modules/editor.js?v=2.4"></script>
+    <script src="js/modules/fill_tools.js?v=2.4"></script>
+    <script src="js/modules/signatures.js?v=2.4"></script>
+    <script src="js/modules/export.js?v=2.4"></script>
+    <script src="js/utils/gestures.js?v=2.4"></script>
+    <script src="js/app.js?v=2.4"></script>
+
+    <!-- Toast de Notificaciones Premium -->
+    <div id="toast-notification">
+        <i class="fa-solid fa-circle-check toast-icon"></i>
+        <span id="toast-message">Borrador guardado con éxito</span>
+    </div>
+
+    <!-- Registro del Service Worker para PWA (Offline Support & Installation) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+                    .catch(err => console.warn('Fallo al registrar el Service Worker:', err));
+            });
         }
-      });
-    }
-  </script>
+    </script>
 
-  <!-- Main JavaScript -->
-  <script src="app.js"></script>
 </body>
 </html>
