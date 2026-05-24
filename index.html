@@ -94,7 +94,22 @@
         <!-- ÁREA DE TRABAJO (CANVAS DE PDF + CAPA INTERACTIVA) -->
         <main id="workspace-container">
             <div id="pdf-scroller">
-                <div id="pdf-viewport">
+                <!-- Estado vacío premium con botón de carga -->
+                <div id="empty-state">
+                    <div class="empty-state-card">
+                        <div class="empty-icon-glow">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <h2>Comienza a editar tu PDF</h2>
+                        <p>Sube un documento para rellenar campos, añadir firmas o corregir texto de forma local, rápida y segura en tu dispositivo.</p>
+                        <label for="pdf-upload" class="btn btn-primary btn-lg" style="cursor: pointer;">
+                            <i class="fa-solid fa-file-arrow-up"></i>
+                            <span>Seleccionar Documento</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="pdf-viewport" style="display: none;">
                     <!-- Canvas donde PDF.js dibuja el PDF real -->
                     <canvas id="pdf-canvas"></canvas>
                     
@@ -131,7 +146,7 @@
             </div>
 
             <!-- Indicador de Carga / Spinner -->
-            <div id="loading-overlay" class="active">
+            <div id="loading-overlay">
                 <div class="spinner"></div>
                 <p>Cargando documento...</p>
             </div>

@@ -415,14 +415,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- 2. CARGA DE PDF ---
-    // Intentar cargar la factura de prueba por defecto
-    try {
-        const defaultPdfUrl = 'assets/sample_invoice.pdf';
-        await loadPdfDocument(defaultPdfUrl);
-    } catch (err) {
-        console.error('Error al cargar PDF por defecto:', err);
-        loadingOverlay.classList.remove('active');
-    }
+    // No cargar ningún PDF por defecto. Se inicia en estado vacío para que el usuario suba su propio archivo.
+    if (loadingOverlay) loadingOverlay.classList.remove('active');
 
     // Carga de archivo manual por el usuario
     pdfUpload.addEventListener('change', async (e) => {
@@ -540,6 +534,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await restoreDraftSession();
                 }, 600);
             }
+
+            // Ocultar estado vacío y mostrar viewport de PDF
+            const emptyState = document.getElementById('empty-state');
+            const pdfViewport = document.getElementById('pdf-viewport');
+            if (emptyState) emptyState.style.display = 'none';
+            if (pdfViewport) pdfViewport.style.display = 'inline-block';
 
             loadingOverlay.classList.remove('active');
             console.log('¡Documento cargado con éxito!');

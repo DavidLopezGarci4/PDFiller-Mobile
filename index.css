@@ -1342,3 +1342,76 @@ body.signature-mode-active .draggable-checkbox-wrapper {
     font-size: 16px;
     animation: bounce 0.5s ease;
 }
+
+/* ESTADO VACÍO (EMPTY STATE) PREMIUM */
+#empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 480px;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.empty-state-card {
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: var(--blur-effect);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 48px 32px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow-premium);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.empty-icon-glow {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1.5px dashed rgba(59, 130, 246, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    color: var(--accent);
+    box-shadow: 0 0 24px rgba(59, 130, 246, 0.15);
+    margin-bottom: 8px;
+    animation: floatIcon 3.5s infinite alternate ease-in-out;
+}
+
+@keyframes floatIcon {
+    0% { transform: translateY(0px) rotate(0deg); }
+    100% { transform: translateY(-8px) rotate(3deg); }
+}
+
+.empty-state-card h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+
+.empty-state-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.btn-lg {
+    padding: 12px 28px;
+    font-size: 14px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
