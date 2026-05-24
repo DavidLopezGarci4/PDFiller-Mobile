@@ -139,7 +139,17 @@ window.exportModule = (() => {
                     let pdfBgColor = PDFLib.rgb(1, 1, 1); // Blanco por defecto
                     let pdfTextColor = PDFLib.rgb(0.059, 0.09, 0.165); // Gris pizarra muy oscuro (#0f172a)
 
-                    if (field.sectionKey === 'cabecera') {
+                    if (field.color) {
+                        try {
+                            const hex = field.color.replace('#', '');
+                            const r = parseInt(hex.substring(0, 2), 16) / 255;
+                            const g = parseInt(hex.substring(2, 4), 16) / 255;
+                            const b = parseInt(hex.substring(4, 6), 16) / 255;
+                            pdfTextColor = PDFLib.rgb(r, g, b);
+                        } catch (e) {
+                            console.warn('Error al parsear color del campo:', e);
+                        }
+                    } else if (field.sectionKey === 'cabecera') {
                         pdfBgColor = PDFLib.rgb(0.118, 0.161, 0.231); // Gris pizarra de cabecera (#1e293b)
                         pdfTextColor = PDFLib.rgb(1, 1, 1); // Blanco
                     } else if (field.sectionKey === 'tabla' && (field.text === 'DESCRIPCIÓN' || field.text === 'CANTIDAD' || field.text === 'PRECIO UNIT.' || field.text === 'TOTAL')) {

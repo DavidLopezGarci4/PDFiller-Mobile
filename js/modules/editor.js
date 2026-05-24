@@ -570,43 +570,46 @@ window.editorModule = (() => {
                     x += event.dx / zoom;
                     y += event.dy / zoom;
 
-                    // APLICAR MAGNETISMO / SNAPPING CON OTROS CAMPOS (AUTOSNAP PREMIUM OPTIMIZADO)
+                    // APLICAR MAGNETISMO / SNAPPING CON OTROS CAMPOS (Omitir para stamps/campos libres)
                     let snapX = x;
                     let snapY = y;
-                    const currentLeft = field.x + x;
-                    const currentTop = field.y + y;
-                    const threshold = 4; // Rango de magnetismo optimizado (más sutil y menos "pegajoso")
 
                     // Remover guías de alineación viejas
                     removeAlignmentGuides();
 
-                    activeFields.forEach(other => {
-                        if (other.id === field.id) return;
+                    if (!field.isStamp) {
+                        const currentLeft = field.x + x;
+                        const currentTop = field.y + y;
+                        const threshold = 4; // Rango de magnetismo optimizado (más sutil y menos "pegajoso")
 
-                        // Obtener coordenadas reales actuales del otro elemento (incluyendo su transformación)
-                        const otherEl = document.getElementById(`wrapper_${other.id}`);
-                        let otherX = other.x;
-                        let otherY = other.y;
-                        if (otherEl && otherEl.style.transform) {
-                            const matches = otherEl.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
-                            if (matches) {
-                                otherX += parseFloat(matches[1]);
-                                otherY += parseFloat(matches[2]);
+                        activeFields.forEach(other => {
+                            if (other.id === field.id) return;
+
+                            // Obtener coordenadas reales actuales del otro elemento (incluyendo su transformación)
+                            const otherEl = document.getElementById(`wrapper_${other.id}`);
+                            let otherX = other.x;
+                            let otherY = other.y;
+                            if (otherEl && otherEl.style.transform) {
+                                const matches = otherEl.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+                                if (matches) {
+                                    otherX += parseFloat(matches[1]);
+                                    otherY += parseFloat(matches[2]);
+                                }
                             }
-                        }
 
-                        // Snapping Vertical (Alinear a la izquierda)
-                        if (Math.abs(currentLeft - otherX) < threshold) {
-                            snapX = otherX - field.x;
-                            drawGuideLine(otherX, 'vertical');
-                        }
+                            // Snapping Vertical (Alinear a la izquierda)
+                            if (Math.abs(currentLeft - otherX) < threshold) {
+                                snapX = otherX - field.x;
+                                drawGuideLine(otherX, 'vertical');
+                            }
 
-                        // Snapping Horizontal (Alinear al tope superior)
-                        if (Math.abs(currentTop - otherY) < threshold) {
-                            snapY = otherY - field.y;
-                            drawGuideLine(otherY, 'horizontal');
-                        }
-                    });
+                            // Snapping Horizontal (Alinear al tope superior)
+                            if (Math.abs(currentTop - otherY) < threshold) {
+                                snapY = otherY - field.y;
+                                drawGuideLine(otherY, 'horizontal');
+                            }
+                        });
+                    }
 
                     x = snapX;
                     y = snapY;

@@ -212,9 +212,13 @@ body, html {
     z-index: 6;
 }
 
-/* Campos creados por nosotros (estampas libres) tienen z-index 10 */
-.editable-field-wrapper.is-stamp {
+/* Campos creados por nosotros (estampas libres) tienen z-index 10 y fondo transparente */
+.editable-field-wrapper.is-stamp,
+.editable-field-wrapper.is-stamp:hover,
+.editable-field-wrapper.is-stamp.active-focus {
     z-index: 10;
+    background-color: transparent !important; /* Fondo transparente para mimetizarse con el PDF original */
+    box-shadow: none !important; /* Sin sombra de caja para mantener el mimetizado */
 }
 
 .editable-field-wrapper.active-focus {
