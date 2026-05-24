@@ -1018,6 +1018,13 @@ input:checked + .slider:before {
     transform: translateX(-50%) scale(1);
 }
 
+/* Ocultar controles rápidos durante la escritura activa para no entorpecer la edición */
+.editable-field-wrapper.is-writing .quick-controls-wrapper {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(-50%) scale(0.6) !important;
+}
+
 .draggable-stamp:hover .btn-delete-element,
 .draggable-stamp.active-focus .btn-delete-element,
 .corrector-patch:hover .btn-delete-element,

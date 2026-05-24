@@ -151,8 +151,18 @@ window.fillToolsModule = (() => {
 
     // ESCUCHAR CLICS EN EL OVERLAY DEL PDF PARA APLICAR LAS HERRAMIENTAS
     overlay.addEventListener('click', (e) => {
-        if (activeTool === 'none' || window.currentTool !== 'none') return;
         if (e.target !== overlay) return;
+
+        // Si hay algún campo seleccionado/enfocado, deseleccionarlo primero y no aplicar la herramienta
+        const activeSel = document.querySelector('.editable-field-wrapper.active-focus, .draggable-stamp.active-focus, .corrector-patch.active-focus, .draggable-checkbox-wrapper.active-focus');
+        if (activeSel) {
+            if (window.editorModule && window.editorModule.clearAllSelections) {
+                window.editorModule.clearAllSelections();
+            }
+            return; // Evitar crear nuevos stamps/casillas en este click
+        }
+
+        if (activeTool === 'none' || window.currentTool !== 'none') return;
 
         // Calcular posición relativa al overlay (normalizada por el zoom)
         const rect = overlay.getBoundingClientRect();

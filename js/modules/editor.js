@@ -46,6 +46,7 @@ window.editorModule = (() => {
     };
 
     // Inyectar el menú flotante premium de 4 opciones (Formato, Editar, Mover, Eliminar)
+    // Inyectar el menú flotante premium de 4 opciones (Formato, Editar, Mover, Eliminar)
     const injectQuickControls = (wrapper, field) => {
         if (wrapper.querySelector('.quick-controls-wrapper')) return;
         
@@ -72,25 +73,55 @@ window.editorModule = (() => {
         formatBtn.style.alignItems = 'center';
         formatBtn.style.justifyContent = 'center';
         formatBtn.innerHTML = '<i class="fa-solid fa-paint-roller"></i>';
-        formatBtn.title = 'Copiar formato';
+        formatBtn.title = 'Formato (Copiar/Pegar)';
         
         formatBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             if (input) {
-                const style = window.getComputedStyle(input);
-                window.copiedFormat = {
-                    fontSize: parseFloat(style.fontSize) || field.fontSize,
-                    color: style.color || '#0f172a',
-                    fontName: field.fontName || 'Helvetica',
-                    fontWeight: style.fontWeight || 'normal',
-                    fontFamily: style.fontFamily || 'Inter, sans-serif',
-                    wrapperBg: wrapper.className.includes('field-bg-dark') ? 'field-bg-dark' : (wrapper.className.includes('field-bg-gray') ? 'field-bg-gray' : 'field-bg-light'),
-                    bgColor: window.getComputedStyle(wrapper).backgroundColor
-                };
-                const workspaceScroller = document.getElementById('pdf-scroller');
-                if (workspaceScroller) workspaceScroller.style.cursor = 'cell';
-                console.log('Formato de texto copiado:', window.copiedFormat);
+                // Si ya hay un formato copiado de otro campo, aplicarlo
+                if (window.copiedFormat && window.copiedFormat.sourceId !== field.id) {
+                    const fmt = window.copiedFormat;
+                    field.fontSize = fmt.fontSize;
+                    field.fontName = fmt.fontName;
+                    if (fmt.color) field.color = fmt.color;
+                    
+                    input.style.fontSize = `${fmt.fontSize}px`;
+                    input.style.color = fmt.color;
+                    input.style.fontWeight = fmt.fontWeight;
+                    input.style.fontFamily = fmt.fontFamily;
+                    
+                    // Actualizar clases de fondo
+                    wrapper.className = wrapper.className.replace(/\bfield-bg-\S+/g, '') + ' ' + fmt.wrapperBg;
+                    
+                    // Recalcular dimensiones
+                    updateFieldDimensions(input, wrapper, field);
+                    
+                    // Limpiar copia de formato
+                    window.copiedFormat = null;
+                    const workspaceScroller = document.getElementById('pdf-scroller');
+                    if (workspaceScroller) workspaceScroller.style.cursor = 'default';
+                    
+                    if (window.historyManager) window.historyManager.saveState();
+                    runCollisionDetection();
+                    console.log('Formato aplicado al campo:', field.id);
+                } else {
+                    // Si no, copiar formato actual
+                    const style = window.getComputedStyle(input);
+                    window.copiedFormat = {
+                        sourceId: field.id,
+                        fontSize: parseFloat(style.fontSize) || field.fontSize,
+                        color: style.color || '#0f172a',
+                        fontName: field.fontName || 'Helvetica',
+                        fontWeight: style.fontWeight || 'normal',
+                        fontFamily: style.fontFamily || 'Inter, sans-serif',
+                        wrapperBg: wrapper.className.includes('field-bg-dark') ? 'field-bg-dark' : (wrapper.className.includes('field-bg-gray') ? 'field-bg-gray' : 'field-bg-light'),
+                        bgColor: window.getComputedStyle(wrapper).backgroundColor
+                    };
+                    const workspaceScroller = document.getElementById('pdf-scroller');
+                    if (workspaceScroller) workspaceScroller.style.cursor = 'cell';
+                    console.log('Formato de texto copiado:', window.copiedFormat);
+                }
             }
         });
 
@@ -118,6 +149,7 @@ window.editorModule = (() => {
             // Bloquear arrastre al editar
             field.locked = true;
             wrapper.classList.remove('dragging-enabled');
+            wrapper.classList.add('is-writing');
             
             // Activar foco y edición en el campo
             input.style.pointerEvents = 'auto';
@@ -157,6 +189,7 @@ window.editorModule = (() => {
             // Desbloquear arrastre interactivo
             field.locked = false;
             wrapper.classList.add('dragging-enabled');
+            wrapper.classList.remove('is-writing');
             
             // Quitar modo de edición para poder arrastrar con suavidad en móviles
             input.style.pointerEvents = 'none';
@@ -297,15 +330,29 @@ window.editorModule = (() => {
                 // Deseleccionar todos los demás wrappers y eliminar sus controles rápidos
                 document.querySelectorAll('.editable-field-wrapper').forEach(w => {
                     if (w !== wrapper) {
-                        w.classList.remove('active-focus');
+                        w.classList.remove('active-focus', 'dragging-enabled', 'is-writing');
                         const controls = w.querySelector('.quick-controls-wrapper');
                         if (controls) controls.remove();
+                        const inp = w.querySelector('.editable-field-input');
+                        if (inp) {
+                            inp.contentEditable = false;
+                            inp.style.pointerEvents = 'none';
+                        }
                     }
                 });
-                document.querySelectorAll('.draggable-stamp, .corrector-patch').forEach(w => w.classList.remove('active-focus'));
+                document.querySelectorAll('.draggable-stamp, .corrector-patch, .draggable-checkbox-wrapper').forEach(w => w.classList.remove('active-focus'));
                 
+                // Asegurar estado neutral al seleccionar inicialmente (bloqueado para arrastre y escritura)
+                field.locked = true;
+                wrapper.classList.remove('dragging-enabled', 'is-writing');
+                input.contentEditable = false;
+                input.style.pointerEvents = 'none';
+
                 wrapper.classList.add('active-focus');
                 injectQuickControls(wrapper, field);
+
+                // Sincronizar barra inferior de formato con este campo
+                syncToolbarToField(field, wrapper);
                 
                 // Si el clic fue en el wrapper pero no en el input de texto, quitar el foco del input para permitir nudging directo
                 if (e.target !== input) {
@@ -377,12 +424,46 @@ window.editorModule = (() => {
         }
     };
 
+    // Auxiliar para sincronizar barra de herramientas con campo seleccionado
+    const syncToolbarToField = (field, wrapper) => {
+        const fontSelect = document.getElementById('text-font-select');
+        const sizeSelect = document.getElementById('text-size-select');
+        const colorSelect = document.getElementById('text-color-select');
+        const bgSelect = document.getElementById('text-bg-select');
+
+        if (fontSelect) {
+            const fontName = (field.fontName || '').toLowerCase();
+            if (fontName.includes('times') || fontName.includes('serif')) {
+                fontSelect.value = 'Georgia, "Times New Roman", serif';
+            } else if (fontName.includes('courier') || fontName.includes('mono')) {
+                fontSelect.value = '"Courier New", Courier, monospace';
+            } else {
+                fontSelect.value = 'Inter, Helvetica, Arial, sans-serif';
+            }
+        }
+
+        if (sizeSelect) {
+            sizeSelect.value = field.fontSize || 'auto';
+        }
+
+        if (colorSelect) {
+            colorSelect.value = field.color || 'auto';
+        }
+
+        if (bgSelect) {
+            const bgClass = wrapper.className.includes('field-bg-dark') ? 'dark' : (wrapper.className.includes('field-bg-gray') ? 'gray' : 'light');
+            bgSelect.value = bgClass;
+        }
+    };
+
     // Registrar eventos para la edición WYSIWYG
     const bindEditEvents = (input, wrapper, field) => {
         let initialText = '';
 
         input.addEventListener('focus', () => {
-            document.querySelectorAll('.editable-field-wrapper').forEach(w => w.classList.remove('active-focus'));
+            document.querySelectorAll('.editable-field-wrapper').forEach(w => {
+                if (w !== wrapper) w.classList.remove('active-focus');
+            });
             wrapper.classList.add('active-focus');
             wrapper.classList.add('is-writing');
 
@@ -398,7 +479,7 @@ window.editorModule = (() => {
                 input.style.fontFamily = fmt.fontFamily;
                 
                 // Actualizar clases de fondo para que combine perfectamente
-                wrapper.className = `editable-field-wrapper active-focus ${fmt.wrapperBg}`;
+                wrapper.className = wrapper.className.replace(/\bfield-bg-\S+/g, '') + ' ' + fmt.wrapperBg;
                 
                 // Recalcular dimensiones
                 updateFieldDimensions(input, wrapper, field);
@@ -419,21 +500,12 @@ window.editorModule = (() => {
         });
 
         input.addEventListener('blur', () => {
-            // Revertir a no editable y pointer-events none para permitir arrastre inmediato libre de interferencia
+            // Revertir a no editable y pointer-events none para arrastre/interacción sin interferencia
             input.contentEditable = false;
             input.style.pointerEvents = 'none';
             wrapper.classList.remove('is-writing');
 
-            // Eliminar controles rápidos flotantes con retraso (solo si sigue bloqueado)
-            setTimeout(() => {
-                if (field.locked === undefined || field.locked === true) {
-                    const controls = wrapper.querySelector('.quick-controls-wrapper');
-                    if (controls) controls.remove();
-                    wrapper.classList.remove('active-focus');
-                }
-            }, 250);
-
-            // Guardar texto editado en el modelo e historial si cambió
+            // Guardar texto editado en el modelo e historial si cambió (no eliminamos controles aquí)
             if (input.textContent !== initialText) {
                 field.text = input.textContent;
                 if (window.historyManager) {
@@ -774,19 +846,89 @@ window.editorModule = (() => {
         }
     };
 
+    // Sincronizar selectores de formato inferiores con el campo seleccionado
+    const setupBottomSelectorsSync = () => {
+        const fontSelect = document.getElementById('text-font-select');
+        const sizeSelect = document.getElementById('text-size-select');
+        const colorSelect = document.getElementById('text-color-select');
+        const bgSelect = document.getElementById('text-bg-select');
+
+        const updateActiveFieldFromToolbar = () => {
+            const activeWrapper = document.querySelector('.editable-field-wrapper.active-focus');
+            if (!activeWrapper) return;
+
+            const input = activeWrapper.querySelector('.editable-field-input');
+            if (!input) return;
+
+            const fieldId = input.id;
+            const field = window.pdfFields.find(f => f.id === fieldId);
+            if (!field) return;
+
+            // 1. Aplicar Fuente
+            if (fontSelect) {
+                const val = fontSelect.value;
+                input.style.fontFamily = val;
+                if (val.includes('Georgia')) {
+                    field.fontName = 'Times-Roman';
+                    input.style.fontWeight = 'normal';
+                } else if (val.includes('Courier')) {
+                    field.fontName = 'Courier';
+                    input.style.fontWeight = 'normal';
+                } else {
+                    field.fontName = 'Helvetica';
+                    input.style.fontWeight = 'normal';
+                }
+            }
+
+            // 2. Aplicar Tamaño
+            if (sizeSelect && sizeSelect.value !== 'auto') {
+                const sizeVal = parseInt(sizeSelect.value);
+                field.fontSize = sizeVal;
+                input.style.fontSize = `${sizeVal}px`;
+            }
+
+            // 3. Aplicar Color
+            if (colorSelect && colorSelect.value !== 'auto') {
+                const colorVal = colorSelect.value;
+                field.color = colorVal;
+                input.style.color = colorVal;
+            }
+
+            // 4. Aplicar Fondo
+            if (bgSelect && bgSelect.value !== 'auto') {
+                const bgVal = bgSelect.value;
+                activeWrapper.classList.remove('field-bg-light', 'field-bg-dark', 'field-bg-gray');
+                activeWrapper.classList.add(`field-bg-${bgVal}`);
+                field.sectionKey = bgVal === 'dark' ? 'cabecera' : (bgVal === 'gray' ? 'tabla' : 'datos');
+            }
+
+            // Recalcular dimensiones y colisiones
+            updateFieldDimensions(input, activeWrapper, field);
+            runCollisionDetection();
+
+            if (window.historyManager) {
+                window.historyManager.saveState();
+            }
+        };
+
+        [fontSelect, sizeSelect, colorSelect, bgSelect].forEach(sel => {
+            if (sel) {
+                sel.addEventListener('change', updateActiveFieldFromToolbar);
+            }
+        });
+    };
+
     // Escuchar clics en el fondo del PDF-overlay para deseleccionar y bloquear todo
     document.addEventListener('DOMContentLoaded', () => {
         const overlay = document.getElementById('pdf-overlay');
         if (overlay) {
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) {
-                    const isFilling = window.fillToolsModule && window.fillToolsModule.getActiveTool && window.fillToolsModule.getActiveTool() !== 'none';
-                    if (!isFilling) {
-                        clearAllSelections();
-                    }
+                    clearAllSelections();
                 }
             });
         }
+        setupBottomSelectorsSync();
     });
 
     // API pública del módulo
