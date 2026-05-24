@@ -239,8 +239,9 @@ window.signaturesModule = (() => {
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         
-        // Mantener tamaño manejable
-        const maxDim = 400;
+        // Aumentar el tamaño máximo a 2048px para conservar la resolución, nitidez
+        // y el grosor original de los trazos finos a mano alzada.
+        const maxDim = 2048;
         let w = img.width;
         let h = img.height;
         if (w > maxDim || h > maxDim) {
@@ -292,7 +293,7 @@ window.signaturesModule = (() => {
         const bgLuminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
         console.log(`[SignatureProcessor] Papel estimado: RGB(${bgR},${bgG},${bgB}), Lum: ${bgLuminance.toFixed(1)}`);
         
-        // 2. Extraer el trazo de tinta utilizando contraste adaptativo y distancia cromática
+        // 2. Extraer el trazo de tinta utilizando contraste adaptativo y desmezclado de color original
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i+1];
@@ -302,34 +303,57 @@ window.signaturesModule = (() => {
             const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
             
             // Relación de contraste respecto al papel de fondo
-            const contrast = (bgLuminance - l) / bgLuminance;
+            const contrast = (bgLuminance - l) / Math.max(1, bgLuminance);
             
             // Si tiene muy poco contraste cromático y lumínico, es papel de fondo
-            const isBackground = contrast < 0.12 && dist < 45;
+            const isBackground = contrast < 0.06 && dist < 25;
             
             if (isBackground) {
-                data[i+3] = 0; // Transparencia absoluta
+                data[i+3] = 0; // Transparencia absoluta para el papel puro
             } else {
                 // Es trazo de firma
                 // Calcular intensidad del trazo (rampa suave de 0 a 1)
-                let strokeFactor = Math.min(1, Math.max(0, (contrast - 0.08) / 0.14));
-                if (dist > 45) {
-                    strokeFactor = Math.max(strokeFactor, Math.min(1, (dist - 35) / 35));
+                // Usamos un umbral de inicio más bajo (0.04 en lugar de 0.08) para preservar trazos súper finos y ligeros (lápiz, bolígrafos finos)
+                let strokeFactor = Math.min(1, Math.max(0, (contrast - 0.04) / 0.16));
+                if (dist > 25) {
+                    strokeFactor = Math.max(strokeFactor, Math.min(1, (dist - 15) / 25));
                 }
                 
-                // Mapear suavemente al color de tinta digital seleccionado
-                const inkHex = strokeColor.replace('#', '');
-                const inkR = parseInt(inkHex.substring(0, 2), 16);
-                const inkG = parseInt(inkHex.substring(2, 4), 16);
-                const inkB = parseInt(inkHex.substring(4, 6), 16);
-                
-                // Mezclar color original del bolígrafo con el color de tinta seleccionado para nitidez óptima
-                data[i] = Math.round(inkR * strokeFactor + r * (1 - strokeFactor));
-                data[i+1] = Math.round(inkG * strokeFactor + g * (1 - strokeFactor));
-                data[i+2] = Math.round(inkB * strokeFactor + b * (1 - strokeFactor));
-                
-                // Opacidad proporcional al trazo
-                data[i+3] = Math.round(strokeFactor * 255);
+                if (strokeFactor === 0) {
+                    data[i+3] = 0;
+                } else {
+                    // Mantener el color y textura original del bolígrafo/lápiz desmezclando el color del papel
+                    // para evitar el efecto de halo blanco al superponer en el PDF.
+                    // Fórmula de desmezclado (Un-premultiplication): P = alpha * I + (1 - alpha) * B => I = (P - (1 - alpha) * B) / alpha
+                    let strokeR = r;
+                    let strokeG = g;
+                    let strokeB = b;
+                    
+                    if (strokeFactor < 1.0 && strokeFactor > 0.05) {
+                        const rawR = (r - (1 - strokeFactor) * bgR) / strokeFactor;
+                        const rawG = (g - (1 - strokeFactor) * bgG) / strokeFactor;
+                        const rawB = (b - (1 - strokeFactor) * bgB) / strokeFactor;
+                        
+                        // Hacer un blend suave hacia el color original cuando strokeFactor es muy bajo
+                        // para evitar el ruido numérico en los bordes extremos del trazo.
+                        const blendOriginal = Math.max(0, Math.min(1, (0.2 - strokeFactor) / 0.15));
+                        
+                        strokeR = Math.round(rawR * (1 - blendOriginal) + r * blendOriginal);
+                        strokeG = Math.round(rawG * (1 - blendOriginal) + g * blendOriginal);
+                        strokeB = Math.round(rawB * (1 - blendOriginal) + b * blendOriginal);
+                    }
+                    
+                    // Clampear para evitar desbordamiento cromático
+                    strokeR = Math.max(0, Math.min(255, strokeR));
+                    strokeG = Math.max(0, Math.min(255, strokeG));
+                    strokeB = Math.max(0, Math.min(255, strokeB));
+                    
+                    data[i] = strokeR;
+                    data[i+1] = strokeG;
+                    data[i+2] = strokeB;
+                    // Opacidad proporcional al trazo
+                    data[i+3] = Math.round(strokeFactor * 255);
+                }
             }
         }
         
