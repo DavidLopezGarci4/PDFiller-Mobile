@@ -1631,4 +1631,11 @@ body:not(.edit-mode-active) #conflict-banner {
     display: none !important;
 }
 
+/* Ocultar los controles rápidos flotantes (copiar formato, candado, papelera) cuando el campo de texto se está editando activamente */
+.editable-field-wrapper:focus-within .quick-controls-wrapper {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: scale(0.6) !important;
+}
+
 
