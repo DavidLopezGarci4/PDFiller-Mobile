@@ -1547,4 +1547,58 @@ body.signature-mode-active .draggable-checkbox-wrapper {
     }
 }
 
+/* ==========================================================================
+   REFINAMIENTOS DE COMPORTAMIENTO DE EDICIÓN Y RELLENADO DE CAMPOS (MODOS)
+   ========================================================================== */
+
+/* MODO EDITAR: Solo los campos ya escritos (originales, no stamps) son interactivos */
+body.edit-mode-active .editable-field-wrapper:not(.is-stamp) {
+    /* Mantiene comportamiento por defecto (draggable, editable) */
+}
+
+/* En Modo Editar, los stamps (nuevos campos de relleno) quedan estáticos y transparentes */
+body.edit-mode-active .editable-field-wrapper.is-stamp {
+    border-color: transparent !important;
+    cursor: default !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+}
+body.edit-mode-active .editable-field-wrapper.is-stamp * {
+    pointer-events: none !important;
+}
+
+/* MODO RELLENAR: Los campos originales se vuelven estáticos e inactivos */
+body.fill-mode-active .editable-field-wrapper:not(.is-stamp) {
+    border-color: transparent !important;
+    cursor: default !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+}
+body.fill-mode-active .editable-field-wrapper:not(.is-stamp) * {
+    pointer-events: none !important;
+}
+
+/* En Modo Rellenar, los stamps (nuevos campos de texto) muestran sus bordes y son 100% interactivos */
+body.fill-mode-active .editable-field-wrapper.is-stamp {
+    border: var(--border-field) !important;
+    cursor: move !important;
+    pointer-events: auto !important;
+}
+body.fill-mode-active .editable-field-wrapper.is-stamp:hover {
+    border-color: var(--accent) !important;
+    background-color: rgba(59, 130, 246, 0.05) !important;
+}
+body.fill-mode-active .editable-field-wrapper.is-stamp.active-focus {
+    border-color: var(--border-field-active) !important;
+    background-color: rgba(99, 102, 241, 0.08) !important;
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.4) !important;
+    cursor: default !important;
+}
+body.fill-mode-active .editable-field-wrapper.is-stamp .editable-field-input {
+    pointer-events: auto !important;
+}
+body.fill-mode-active .editable-field-wrapper.is-stamp.active-focus .editable-field-input {
+    cursor: text !important;
+}
+
 

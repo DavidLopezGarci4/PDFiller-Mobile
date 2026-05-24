@@ -342,6 +342,11 @@ window.editorModule = (() => {
         } else if (hudCoords) {
             hudCoords.textContent = 'Ninguno';
         }
+
+        // Poblar dinámicamente opciones de formato en la barra de texto Rellenar
+        if (window.fillToolsModule && window.fillToolsModule.populateTextSettingsFromFields) {
+            window.fillToolsModule.populateTextSettingsFromFields();
+        }
     };
 
     // Registrar eventos para la edición WYSIWYG
@@ -483,7 +488,11 @@ window.editorModule = (() => {
             listeners: {
                 start(event) {
                     if (field.locked === undefined) field.locked = true;
-                    if (field.locked) {
+                    
+                    const isRellenar = document.body.classList.contains('fill-mode-active');
+                    const bypassLock = field.isStamp && isRellenar;
+                    
+                    if (field.locked && !bypassLock) {
                         event.interaction.stop(); // Detener el arrastre de inmediato
                         return;
                     }
@@ -610,17 +619,19 @@ window.editorModule = (() => {
         // Comparación cruzada de todos los elementos (Fuerza Bruta O(N^2) sobre campos activos, N es pequeño)
         for (let i = 0; i < activeFields.length; i++) {
             const f1 = activeFields[i];
+            if (f1.isStamp) continue; // EXCLUIR STAMPS DE LAS COLISIONES CON OTROS
             
             // Obtener dimensiones reales del primer campo
             const r1 = getFieldBoundingRect(f1);
 
             for (let j = i + 1; j < activeFields.length; j++) {
                 const f2 = activeFields[j];
+                if (f2.isStamp) continue; // EXCLUIR STAMPS DE LAS COLISIONES CON OTROS
                 
                 // Obtener dimensiones reales del segundo campo
                 const r2 = getFieldBoundingRect(f2);
 
-                // Algoritmo AABB de colisión 2D con umbral del 2%
+                // Algoritmo AABB de colisión 2D con umbral del 35%
                 const left = Math.max(r1.x, r2.x);
                 const right = Math.min(r1.x + r1.w, r2.x + r2.w);
                 const top = Math.max(r1.y, r2.y);
@@ -633,10 +644,10 @@ window.editorModule = (() => {
                     const minW = Math.min(r1.w, r2.w);
                     const minH = Math.min(r1.h, r2.h);
 
-                    // Considerar colisión real solo si el solapamiento penetra más del 2% del tamaño vertical y horizontal del campo más pequeño
-                    // Con un mínimo absoluto de 2px de intersección para evitar que el mero contacto o ruido de redondeo dispare la alarma.
-                    const thresholdW = Math.max(2, minW * 0.02);
-                    const thresholdH = Math.max(2, minH * 0.02);
+                    // Considerar colisión real solo si el solapamiento penetra más del 35% del tamaño vertical y horizontal del campo más pequeño
+                    // Con un mínimo absoluto de 8px de intersección para evitar falsos positivos por cercanía visual responsiva.
+                    const thresholdW = Math.max(8, minW * 0.35);
+                    const thresholdH = Math.max(8, minH * 0.35);
 
                     if (overlapW >= thresholdW && overlapH >= thresholdH) {
                         // ¡COLISIÓN DETECTADA! Guardar IDs en conflicto

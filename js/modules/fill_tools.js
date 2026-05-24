@@ -252,27 +252,52 @@ window.fillToolsModule = (() => {
     const createTextStamp = (x, y) => {
         console.log(`Estampando texto libre en: ${x}, ${y}`);
         
-        // Estilo dinámico u automático según la sección
-        let finalColor = '#000000';
+        const fontSelect = document.getElementById('text-font-select');
+        const sizeSelect = document.getElementById('text-size-select');
+        const colorSelect = document.getElementById('text-color-select');
+        const bgSelect = document.getElementById('text-bg-select');
+
+        // Extraer valores seleccionados
+        const selFont = fontSelect ? fontSelect.value : 'Inter, Helvetica, Arial, sans-serif';
+        const selSize = sizeSelect ? sizeSelect.value : 'auto';
+        const selColor = colorSelect ? colorSelect.value : 'auto';
+        const selBg = bgSelect ? bgSelect.value : 'auto';
+
+        // Lógica de auto-detección según la posición vertical Y
+        const overlayHeight = overlay.clientHeight || 1000;
+        const yPercent = (y / overlayHeight) * 100;
+
+        let finalColor = '#0f172a';
         let finalSize = 12;
-        let isBold = false;
-        
-        if (selectedTextColor === 'auto' || selectedTextSize === 'auto') {
-            // Auto-detectar según Y
-            const overlayHeight = overlay.clientHeight;
-            const yPercent = (y / overlayHeight) * 100;
-            
-            if (yPercent < 22) { // Cabecera
-                if (selectedTextColor === 'auto') finalColor = '#ffffff';
-                if (selectedTextSize === 'auto') { finalSize = 14; isBold = true; }
-            } else { // Resto
-                if (selectedTextColor === 'auto') finalColor = '#0f172a';
-                if (selectedTextSize === 'auto') finalSize = 10;
-            }
+        let finalBg = 'light';
+        let finalFontName = 'Helvetica';
+
+        if (selColor === 'auto') {
+            finalColor = yPercent < 22 ? '#ffffff' : '#0f172a';
+        } else {
+            finalColor = selColor;
         }
-        
-        if (selectedTextColor !== 'auto') finalColor = selectedTextColor;
-        if (selectedTextSize !== 'auto') finalSize = parseInt(selectedTextSize);
+
+        if (selSize === 'auto') {
+            finalSize = yPercent < 22 ? 14 : 10;
+        } else {
+            finalSize = parseInt(selSize);
+        }
+
+        if (selBg === 'auto') {
+            finalBg = yPercent < 22 ? 'dark' : 'light';
+        } else {
+            finalBg = selBg;
+        }
+
+        // Determinar nombre del font interno
+        if (selFont.includes('Courier')) {
+            finalFontName = 'Courier';
+        } else if (selFont.includes('Georgia')) {
+            finalFontName = 'Times-Roman';
+        } else {
+            finalFontName = yPercent < 22 ? 'Helvetica-Bold' : 'Helvetica';
+        }
 
         const stampId = `text_stamp_${Date.now()}`;
         
@@ -282,14 +307,15 @@ window.fillToolsModule = (() => {
             text: 'Nuevo Texto...',
             x: x,
             y: y,
-            width: 100, // Anchura y altura iniciales para "Nuevo Texto..."
+            width: 100, // Anchura y altura iniciales
             height: 22,
             fontSize: finalSize,
-            fontName: isBold ? 'Helvetica-Bold' : 'Helvetica',
+            fontName: finalFontName,
             originalFontSize: finalSize / window.pdfScale,
-            color: finalColor, // Guardamos el color de la tinta
-            sectionKey: (y / overlay.clientHeight) * 100 < 22 ? 'cabecera' : 'datos',
+            color: finalColor,
+            sectionKey: finalBg === 'dark' ? 'cabecera' : (finalBg === 'gray' ? 'tabla' : 'datos'),
             isStamp: true,
+            locked: false, // ¡DESBLOQUEADO POR DEFECTO PARA ARRASTRAR Y SITUAR!
             pageNum: window.pdfPageNum || 1
         };
 
@@ -1237,6 +1263,166 @@ window.fillToolsModule = (() => {
         return false;
     };
 
+    // ESCANEAR CAMPOS DEL PDF Y EXTRAER FORMATOS EXISTENTES DE LETRA Y FONDO
+    const populateTextSettingsFromFields = () => {
+        if (!window.pdfFields || window.pdfFields.length === 0) return;
+
+        console.log('Populando dinámicamente opciones de formato desde los campos del PDF...');
+
+        // 1. Extraer fuentes, tamaños y colores únicos y sus frecuencias
+        const uniqueFonts = new Set();
+        const uniqueSizes = new Set();
+        const uniqueColors = new Set();
+        const uniqueBgs = new Set(['light', 'dark', 'gray']);
+
+        const fontFreq = {};
+        const sizeFreq = {};
+        const colorFreq = {};
+
+        window.pdfFields.forEach(field => {
+            if (field.isStamp) return; // Omitir stamps para solo reflejar estilos originales
+
+            if (field.fontName) {
+                const name = field.fontName.toLowerCase();
+                let family = 'Inter, Helvetica, Arial, sans-serif';
+                let label = 'Inter / Helvetica';
+                if (name.includes('times') || name.includes('serif')) {
+                    family = 'Georgia, "Times New Roman", serif';
+                    label = 'Georgia / Serif';
+                } else if (name.includes('courier') || name.includes('mono')) {
+                    family = '"Courier New", Courier, monospace';
+                    label = 'Courier / Mono';
+                }
+                uniqueFonts.add(JSON.stringify({ value: family, label: label }));
+                fontFreq[family] = (fontFreq[family] || 0) + 1;
+            }
+            if (field.fontSize) {
+                uniqueSizes.add(field.fontSize);
+                sizeFreq[field.fontSize] = (sizeFreq[field.fontSize] || 0) + 1;
+            }
+            const c = field.color || '#0f172a';
+            uniqueColors.add(c);
+            colorFreq[c] = (colorFreq[c] || 0) + 1;
+            
+            if (field.sectionKey === 'cabecera') {
+                uniqueBgs.add('dark');
+            } else if (field.sectionKey === 'tabla' && (field.text === 'DESCRIPCIÓN' || field.text === 'CANTIDAD' || field.text === 'PRECIO UNIT.' || field.text === 'TOTAL')) {
+                uniqueBgs.add('gray');
+            } else {
+                uniqueBgs.add('light');
+            }
+        });
+
+        // Encontrar los valores más repetidos (Modas)
+        const getMode = (freqMap, defaultVal) => {
+            let maxCount = 0;
+            let modeVal = defaultVal;
+            Object.keys(freqMap).forEach(key => {
+                if (freqMap[key] > maxCount) {
+                    maxCount = freqMap[key];
+                    modeVal = key;
+                }
+            });
+            return modeVal;
+        };
+
+        const modeFont = getMode(fontFreq, 'Inter, Helvetica, Arial, sans-serif');
+        const modeSize = getMode(sizeFreq, '10');
+        const modeColor = getMode(colorFreq, '#0f172a');
+
+        console.log(`[FormatoPorDefecto] Moda detectada -> Fuente: ${modeFont}, Tamaño: ${modeSize}px, Color: ${modeColor}`);
+
+        // Poblar Selector de Fuentes
+        const fontSelect = document.getElementById('text-font-select');
+        if (fontSelect) {
+            fontSelect.innerHTML = '';
+            const fontItems = Array.from(uniqueFonts).map(item => JSON.parse(item));
+            if (fontItems.length === 0) {
+                fontItems.push({ value: 'Inter, Helvetica, Arial, sans-serif', label: 'Inter / Helvetica' });
+            }
+            fontItems.forEach(font => {
+                const opt = document.createElement('option');
+                opt.value = font.value;
+                opt.textContent = font.label;
+                fontSelect.appendChild(opt);
+            });
+            fontSelect.value = modeFont;
+        }
+
+        // Poblar Selector de Tamaños
+        const sizeSelect = document.getElementById('text-size-select');
+        if (sizeSelect) {
+            sizeSelect.innerHTML = '';
+            const autoOpt = document.createElement('option');
+            autoOpt.value = 'auto';
+            autoOpt.textContent = 'Auto (Detectar)';
+            sizeSelect.appendChild(autoOpt);
+
+            const sortedSizes = Array.from(uniqueSizes).sort((a, b) => a - b);
+            sortedSizes.forEach(size => {
+                const opt = document.createElement('option');
+                opt.value = size;
+                opt.textContent = `${size} px`;
+                sizeSelect.appendChild(opt);
+            });
+            sizeSelect.value = modeSize; // Por defecto el tamaño que más se repite
+        }
+
+        // Poblar Selector de Colores
+        const colorSelect = document.getElementById('text-color-select');
+        if (colorSelect) {
+            colorSelect.innerHTML = '';
+            const autoOpt = document.createElement('option');
+            autoOpt.value = 'auto';
+            autoOpt.textContent = 'Auto (Detectar)';
+            colorSelect.appendChild(autoOpt);
+
+            uniqueColors.add('#0f172a');
+            uniqueColors.add('#2563eb');
+            uniqueColors.add('#ef4444');
+            uniqueColors.add('#ffffff');
+
+            const colorNames = {
+                '#0f172a': 'Slate Oscuro',
+                '#2563eb': 'Azul Cobalto',
+                '#ef4444': 'Rojo Coral',
+                '#ffffff': 'Blanco Puro'
+            };
+
+            Array.from(uniqueColors).forEach(color => {
+                const opt = document.createElement('option');
+                opt.value = color;
+                opt.textContent = colorNames[color] || `Tinta (${color})`;
+                colorSelect.appendChild(opt);
+            });
+            colorSelect.value = modeColor; // Por defecto el color que más se repite
+        }
+
+        // Poblar Selector de Fondos
+        const bgSelect = document.getElementById('text-bg-select');
+        if (bgSelect) {
+            bgSelect.innerHTML = '';
+            const autoOpt = document.createElement('option');
+            autoOpt.value = 'auto';
+            autoOpt.textContent = 'Auto (Detectar)';
+            bgSelect.appendChild(autoOpt);
+
+            const bgNames = {
+                'light': 'Caja Clara / Blanca',
+                'dark': 'Caja Oscura / Slate',
+                'gray': 'Caja Gris / Neutral'
+            };
+
+            Array.from(uniqueBgs).forEach(bg => {
+                const opt = document.createElement('option');
+                opt.value = bg;
+                opt.textContent = bgNames[bg] || bg;
+                bgSelect.appendChild(opt);
+            });
+            bgSelect.value = 'auto';
+        }
+    };
+
     // API pública para exportación e historial
     return {
         getCorrectorPatches: () => correctorPatches,
@@ -1255,6 +1441,7 @@ window.fillToolsModule = (() => {
         showPotentialCheckboxes: showPotentialCheckboxes,
         clearPotentialCheckboxes: clearPotentialCheckboxes,
         getActiveTool: () => activeTool,
-        toggleTool: toggleTool
+        toggleTool: toggleTool,
+        populateTextSettingsFromFields: populateTextSettingsFromFields
     };
 })();
