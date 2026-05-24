@@ -356,6 +356,7 @@ window.editorModule = (() => {
         input.addEventListener('focus', () => {
             document.querySelectorAll('.editable-field-wrapper').forEach(w => w.classList.remove('active-focus'));
             wrapper.classList.add('active-focus');
+            wrapper.classList.add('is-writing');
 
             // SI COPIAR FORMATO (PAINT ROLLER) ESTÁ ACTIVO, APLICAR EL FORMATO COPIADO INMEDIATAMENTE
             if (window.copiedFormat) {
@@ -393,6 +394,7 @@ window.editorModule = (() => {
             // Revertir a no editable y pointer-events none para permitir arrastre inmediato libre de interferencia
             input.contentEditable = false;
             input.style.pointerEvents = 'none';
+            wrapper.classList.remove('is-writing');
 
             // Eliminar controles rápidos flotantes con retraso (solo si sigue bloqueado)
             setTimeout(() => {
