@@ -1,31 +1,21 @@
-// PDFiller 2 - Text Parsing and Coordinate Clustering Module
+// PDFiller 2 - Text Parsing and Horizontal Clustering Module
 window.parsePdfTextContent = async (page, viewport) => {
     const pageNum = page.pageNumber || window.pdfPageNum || 1;
-    console.log(`Iniciando extracción y parseo de campos para página ${pageNum}...`);
+    console.log(`Iniciando extracción y parseo de campos con fusión horizontal para página ${pageNum}...`);
+    
     const textContent = await page.getTextContent();
     const dropdown = document.getElementById('fields-dropdown');
     
     // Resetear dropdown (guardando la opción por defecto)
     dropdown.innerHTML = '<option value="" disabled selected>Selecciona un campo para editar...</option>';
 
-    // Array interno para almacenar los campos editables
-    const fields = [];
+    // 1. Extraer ítems crudos y calcular sus coordenadas de pantalla
+    const rawItems = [];
+    textContent.items.forEach((item) => {
+        const str = item.str; // Conservar espacios y caracteres individuales para reconstrucción
+        if (str === undefined || str === null) return;
 
-    // Agrupación en secciones lógicas basadas en la posición vertical Y (porcentajes de la página)
-    const sections = {
-        cabecera: { name: '📌 Cabecera e Información General', items: [] },
-        datos: { name: '👤 Datos de Cliente y Facturación', items: [] },
-        tabla: { name: '📊 Tabla de Conceptos', items: [] },
-        totales: { name: '💰 Totales e Impuestos', items: [] },
-        pie: { name: '🖋️ Notas y Firmas', items: [] }
-    };
-
-    // Procesar cada bloque de texto devuelto por PDF.js
-    textContent.items.forEach((item, index) => {
-        const str = item.str.trim();
-        if (!str || str.length < 2) return; // Omitir espacios vacíos y caracteres aislados
-
-        // Determinar alto de fuente de forma ultra-segura (PDF.js height o transform scale)
+        // Determinar alto de fuente de forma segura (PDF.js height o transform scale)
         let fontHeight = item.height;
         if (!fontHeight && item.transform && item.transform[3]) {
             fontHeight = Math.abs(item.transform[3]);
@@ -34,72 +24,151 @@ window.parsePdfTextContent = async (page, viewport) => {
             fontHeight = 12; // Fallback razonable
         }
 
-        // Determinar ancho de fuente de forma ultra-segura (PDF.js width o estimación según caracteres)
+        // Determinar ancho de fuente de forma segura (PDF.js width o estimación por caracteres)
         let textWidth = item.width;
         if (!textWidth || isNaN(textWidth)) {
             textWidth = str.length * fontHeight * 0.55; 
         }
 
-        // PDF.js devuelve la matriz de transformación: [scaleX, skewY, skewX, scaleY, transX, transY]
-        // Convertimos a coordenadas de pantalla (píxeles con escala adaptada)
+        // Convertir coordenadas de PDF (Y empieza abajo) a coordenadas de pantalla (Y empieza arriba)
         const tx = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-        
-        // Coordenadas corregidas (Y en PDF empieza abajo, en HTML empieza arriba)
         const x = tx[0];
         const y = tx[1] - (fontHeight * window.pdfScale); // Desplazamiento para alinear base
         const width = textWidth * window.pdfScale;
         const height = fontHeight * window.pdfScale;
 
-        // Determinar estilo de tipografía (PDF.js provee metadatos del font)
         const fontName = item.fontName || 'Helvetica';
         const fontSizePx = Math.round(fontHeight * window.pdfScale);
-        
-        // Determinar sección según porcentaje de altura del PDF
-        const yPercent = (y / viewport.height) * 100;
-        let sectionKey = 'cabecera';
 
-        if (yPercent < 22) {
-            sectionKey = 'cabecera';
-        } else if (yPercent >= 22 && yPercent < 36) {
-            sectionKey = 'datos';
-        } else if (yPercent >= 36 && yPercent < 56) {
-            sectionKey = 'tabla';
-        } else if (yPercent >= 56 && yPercent < 72) {
-            sectionKey = 'totales';
-        } else {
-            sectionKey = 'pie';
-        }
-
-        const fieldId = `field_${index}`;
-        const fieldData = {
-            id: fieldId,
-            text: str,
-            originalText: str, // NUEVO: Guardar el texto original de la factura para detectar modificaciones
+        rawItems.push({
+            str: str,
             x: x,
             y: y,
-            startX: x, // Coordenadas de inicio de vista originales (para el parche corrector)
-            startY: y,
-            width: width + 20, // Agregar padding extra para editar cómodamente
-            height: height + 6,
-            fontSize: fontSizePx,
+            width: width,
+            height: height,
             fontName: fontName,
-            yPercent: yPercent,
-            sectionKey: sectionKey, // Guardar la sección a la que pertenece
-            originalX: item.transform[4], // Coordenadas PDF originales para exportación
-            originalY: item.transform[5],
-            originalFontSize: fontHeight,
-            pageNum: pageNum // Guardar número de página!
-        };
-
-        if (index < 5) {
-            console.log(`[TextParser] Campo parseado #${index}: "${str}" en [X:${Math.round(x)}, Y:${Math.round(y)}] - Alto: ${Math.round(height)}px`);
-        }
-
-        fields.push(fieldData);
-        sections[sectionKey].items.push(fieldData);
+            fontSizePx: fontSizePx,
+            fontHeight: fontHeight,
+            originalX: item.transform[4],
+            originalY: item.transform[5]
+        });
     });
 
-    // Rellenar el dropdown agrupado
+    // 2. Fusión Horizontal Inteligente (Clustering por línea vertical y cercanía horizontal)
+    const mergedFields = [];
+
+    rawItems.forEach(item => {
+        const trimmedStr = item.str.trim();
+        
+        let merged = false;
+        
+        // Buscar de atrás hacia adelante en los campos combinados para mayor velocidad (ya que están en orden)
+        for (let i = mergedFields.length - 1; i >= 0; i--) {
+            const field = mergedFields[i];
+            
+            // Verificar si el elemento está en la misma línea vertical (margen de baseline Y < 4px)
+            const sameLine = Math.abs(field.y - item.y) < 4;
+            
+            if (sameLine) {
+                // Margen horizontal de seguridad: máximo de 30px o 2.5 veces el tamaño de la fuente para espacios
+                const maxGap = Math.max(30, item.fontSizePx * 2.5);
+                
+                const isAfter = item.x >= field.x && item.x <= (field.x + field.width + maxGap);
+                const isBefore = field.x >= item.x && field.x <= (item.x + item.width + maxGap);
+
+                if (isAfter || isBefore) {
+                    if (isAfter) {
+                        // El nuevo fragmento está a la derecha del campo acumulado
+                        const gap = item.x - (field.x + field.width);
+                        // Añadir un espacio si hay separación física y no existe ya un espacio
+                        const needsSpace = gap > 2 && !field.text.endsWith(' ') && !item.str.startsWith(' ');
+                        field.text += (needsSpace ? ' ' : '') + item.str;
+                        field.width = Math.max(field.width, (item.x + item.width) - field.x);
+                    } else {
+                        // El nuevo fragmento está a la izquierda (orden inverso)
+                        const gap = field.x - (item.x + item.width);
+                        const needsSpace = gap > 2 && !item.str.endsWith(' ') && !field.text.startsWith(' ');
+                        field.text = item.str + (needsSpace ? ' ' : '') + field.text;
+                        field.width = Math.max(field.width, (field.x + field.width) - item.x);
+                        field.x = item.x;
+                    }
+                    
+                    // Actualizar texto original para el control de cambios
+                    field.originalText = field.text;
+                    merged = true;
+                    break;
+                }
+            }
+        }
+
+        if (!merged) {
+            // Omitir fragmentos vacíos como campos independientes
+            if (trimmedStr === '') return;
+
+            // Determinar sección según el porcentaje de la altura de página
+            const yPercent = (item.y / viewport.height) * 100;
+            let sectionKey = 'cabecera';
+
+            if (yPercent < 22) {
+                sectionKey = 'cabecera';
+            } else if (yPercent >= 22 && yPercent < 36) {
+                sectionKey = 'datos';
+            } else if (yPercent >= 36 && yPercent < 56) {
+                sectionKey = 'tabla';
+            } else if (yPercent >= 56 && yPercent < 72) {
+                sectionKey = 'totales';
+            } else {
+                sectionKey = 'pie';
+            }
+
+            mergedFields.push({
+                text: item.str,
+                originalText: item.str,
+                x: item.x,
+                y: item.y,
+                startX: item.x,
+                startY: item.y,
+                width: item.width,
+                height: item.height,
+                fontSize: item.fontSizePx,
+                fontName: item.fontName,
+                yPercent: yPercent,
+                sectionKey: sectionKey,
+                originalX: item.originalX,
+                originalY: item.originalY,
+                originalFontSize: item.fontHeight,
+                pageNum: pageNum
+            });
+        }
+    });
+
+    // 3. Formatear y añadir padding a los campos combinados finales
+    const finalFields = mergedFields.map((field, index) => {
+        field.id = `field_${index}`;
+        field.width = field.width + 20; // Padding horizontal para edición cómoda
+        field.height = field.height + 6; // Padding vertical
+        
+        // Limpiar espacios duplicados accidentales durante la fusión
+        field.text = field.text.replace(/\s+/g, ' ');
+        field.originalText = field.text;
+        
+        return field;
+    });
+
+    // Agrupación en secciones lógicas para rellenar el dropdown agrupado
+    const sections = {
+        cabecera: { name: '📌 Cabecera e Información General', items: [] },
+        datos: { name: '👤 Datos de Cliente y Facturación', items: [] },
+        tabla: { name: '📊 Tabla de Conceptos', items: [] },
+        totales: { name: '💰 Totales e Impuestos', items: [] },
+        pie: { name: '🖋️ Notas y Firmas', items: [] }
+    };
+
+    finalFields.forEach(field => {
+        sections[field.sectionKey].items.push(field);
+    });
+
+    // Rellenar el dropdown agrupado en la interfaz
     Object.keys(sections).forEach(key => {
         const sec = sections[key];
         if (sec.items.length === 0) return;
@@ -110,7 +179,6 @@ window.parsePdfTextContent = async (page, viewport) => {
         sec.items.forEach(field => {
             const opt = document.createElement('option');
             opt.value = field.id;
-            // Mostrar texto truncado si es demasiado largo
             const previewText = field.text.length > 25 ? field.text.substring(0, 25) + '...' : field.text;
             opt.textContent = `${previewText} [Font: ${field.fontSize}px]`;
             optGroup.appendChild(opt);
@@ -121,7 +189,7 @@ window.parsePdfTextContent = async (page, viewport) => {
 
     // Guardar lista en variable global (preservando campos de otras páginas y estampas de esta página)
     window.pdfFields = (window.pdfFields || []).filter(f => f.pageNum !== pageNum || f.isStamp);
-    window.pdfFields = [...window.pdfFields, ...fields];
+    window.pdfFields = [...window.pdfFields, ...finalFields];
 
     // Actualizar HUD de diagnóstico
     const hudScale = document.getElementById('hud-scale');
