@@ -71,6 +71,11 @@ const dom = {
   navBtnIcon: document.getElementById('nav-btn-icon'),
   drawerOverlay: document.getElementById('drawer-overlay'),
   drawerIcon: document.getElementById('drawer-icon'),
+  
+  // Header Quick Actions
+  btnUndoHeader: document.getElementById('btn-undo-header'),
+  btnRedoHeader: document.getElementById('btn-redo-header'),
+  btnDeleteHeader: document.getElementById('btn-delete-header'),
 
   // Drawer: Document Management
   docFilename: document.getElementById('doc-filename'),
@@ -240,6 +245,20 @@ function initEventListeners() {
   // Undo / Redo & Clear All
   dom.btnUndo.addEventListener('click', undo);
   dom.btnRedo.addEventListener('click', redo);
+  
+  if (dom.btnUndoHeader) {
+    dom.btnUndoHeader.addEventListener('click', undo);
+  }
+  if (dom.btnRedoHeader) {
+    dom.btnRedoHeader.addEventListener('click', redo);
+  }
+  if (dom.btnDeleteHeader) {
+    dom.btnDeleteHeader.addEventListener('click', () => {
+      if (state.activeAnnotationId) {
+        deleteAnnotation(state.activeAnnotationId);
+      }
+    });
+  }
   dom.btnClearAll.addEventListener('click', () => {
     closeAllDrawers();
     clearAllAnnotations();
@@ -757,7 +776,7 @@ function addTextAnnotation(pageNum, xPercent, yPercent, text = 'Texto...', custo
     page: pageNum,
     xPercent: adjustedX,
     yPercent: adjustedY,
-    widthPercent: settings.widthPercent || 0.35, // Default 35% page width for horizontal resizing
+    widthPercent: settings.widthPercent || null, // null defaults to auto-width
     text: text,
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
@@ -1029,6 +1048,11 @@ function createTextDomElement(anno) {
   contentEl.contentEditable = true;
   contentEl.spellcheck = false;
   contentEl.innerText = anno.text;
+  if (anno.widthPercent) {
+    contentEl.style.whiteSpace = 'pre-wrap';
+  } else {
+    contentEl.style.whiteSpace = 'pre';
+  }
   el.appendChild(contentEl);
   
   if (state.activeAnnotationId === anno.id) el.classList.add('active');
@@ -1192,8 +1216,42 @@ function startCorrectorDraw(e, pageNum, overlay) {
   
   let hexColor = '#ffffff';
   try {
-    const pixel = ctx.getImageData(canvasX, canvasY, 1, 1).data;
-    hexColor = rgbToHex(pixel[0], pixel[1], pixel[2]);
+    // Read a 9x9 pixels box centered at (canvasX, canvasY)
+    const startX = Math.max(0, canvasX - 4);
+    const startY = Math.max(0, canvasY - 4);
+    const scanW = Math.min(9, canvas.width - startX);
+    const scanH = Math.min(9, canvas.height - startY);
+    
+    if (scanW > 0 && scanH > 0) {
+      const imgData = ctx.getImageData(startX, startY, scanW, scanH);
+      const data = imgData.data;
+      
+      const colorCounts = {};
+      let maxCount = 0;
+      let dominantColor = '#ffffff';
+      
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i+3] === 0) continue; // ignore transparent
+        
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        
+        // Quantize colors slightly to multiples of 8 to group compression noise/gradients
+        const qr = Math.round(r / 8) * 8;
+        const qg = Math.round(g / 8) * 8;
+        const qb = Math.round(b / 8) * 8;
+        
+        const hex = rgbToHex(qr, qg, qb);
+        colorCounts[hex] = (colorCounts[hex] || 0) + 1;
+        
+        if (colorCounts[hex] > maxCount) {
+          maxCount = colorCounts[hex];
+          dominantColor = rgbToHex(r, g, b); // store original unquantized color
+        }
+      }
+      hexColor = dominantColor;
+    }
   } catch (err) {
     console.warn('Failed to sample background color:', err);
   }
@@ -1317,6 +1375,10 @@ function setActiveAnnotation(id) {
       });
     }
   }
+  
+  if (dom.btnDeleteHeader) {
+    dom.btnDeleteHeader.disabled = !id;
+  }
 }
 
 function updateActiveOrPresetStyle(property, value) {
@@ -1391,16 +1453,19 @@ function makeDraggable(element, annotationId, isSignature) {
     
     setActiveAnnotation(annotationId);
     if (isSignature) e.preventDefault();
+    e.stopPropagation();
     
     dragStart(e, false);
   }
   
+  // Mobile finger triggers
   function dragStartTouch(e) {
     if (e.target.closest('.anno-btn-delete')) return;
     if (e.target.closest('.sig-resize-handle')) return;
     
     setActiveAnnotation(annotationId);
     if (isSignature) e.preventDefault();
+    e.stopPropagation();
     
     dragStart(e.touches[0], true);
   }
@@ -1428,11 +1493,14 @@ function makeDraggable(element, annotationId, isSignature) {
   }
   
   function dragMoveMouse(e) {
+    e.stopPropagation();
     dragMove(e);
   }
   
+  // Prevent page scroll bounce under dragging
   function dragMoveTouch(e) {
-    e.preventDefault(); // Stop mobile document shell bounce scrolling
+    e.preventDefault();
+    e.stopPropagation();
     dragMove(e.touches[0]);
   }
   
@@ -1449,8 +1517,36 @@ function makeDraggable(element, annotationId, isSignature) {
     }
     
     if (isDragging) {
-      const leftPercent = startLeft + (dx / parentRect.width);
-      const topPercent = startTop + (dy / parentRect.height);
+      let leftPercent = startLeft + (dx / parentRect.width);
+      let topPercent = startTop + (dy / parentRect.height);
+      
+      // Smart Snapping to Sibling Annotations on the same page
+      const SNAP_THRESHOLD = 0.012; // 1.2% snap tolerance
+      let snappedLeft = false;
+      let snappedTop = false;
+      
+      const pageNum = parseInt(parent.dataset.page);
+      const siblings = state.annotations.filter(a => a.id !== annotationId && a.page === pageNum);
+      
+      for (const sib of siblings) {
+        if (Math.abs(leftPercent - sib.xPercent) < SNAP_THRESHOLD) {
+          leftPercent = sib.xPercent;
+          snappedLeft = true;
+          showAlignGuide('v', sib.xPercent * parentRect.width, parent);
+          break;
+        }
+      }
+      if (!snappedLeft) hideAlignGuide('v', parent);
+      
+      for (const sib of siblings) {
+        if (Math.abs(topPercent - sib.yPercent) < SNAP_THRESHOLD) {
+          topPercent = sib.yPercent;
+          snappedTop = true;
+          showAlignGuide('h', sib.yPercent * parentRect.height, parent);
+          break;
+        }
+      }
+      if (!snappedTop) hideAlignGuide('h', parent);
       
       const clampedLeft = Math.max(0, Math.min(1 - (element.offsetWidth / parentRect.width), leftPercent));
       const clampedTop = Math.max(0, Math.min(1 - (element.offsetHeight / parentRect.height), topPercent));
@@ -1477,6 +1573,9 @@ function makeDraggable(element, annotationId, isSignature) {
       element.classList.remove('dragging');
       
       const parent = element.parentElement;
+      hideAlignGuide('v', parent);
+      hideAlignGuide('h', parent);
+      
       const rect = element.getBoundingClientRect();
       const parentRect = parent.getBoundingClientRect();
       
@@ -1771,8 +1870,13 @@ function redo() {
 }
 
 function updateUndoRedoButtons() {
-  dom.btnUndo.disabled = state.historyIndex <= 0;
-  dom.btnRedo.disabled = state.historyIndex >= state.history.length - 1;
+  const undoDisabled = state.historyIndex <= 0;
+  const redoDisabled = state.historyIndex >= state.history.length - 1;
+  
+  dom.btnUndo.disabled = undoDisabled;
+  dom.btnRedo.disabled = redoDisabled;
+  if (dom.btnUndoHeader) dom.btnUndoHeader.disabled = undoDisabled;
+  if (dom.btnRedoHeader) dom.btnRedoHeader.disabled = redoDisabled;
 }
 
 function updateElementCount() {
@@ -2113,9 +2217,30 @@ function processImageSignatureAndRemoveBg(base64Str, callback) {
         const r = data[i];
         const g = data[i+1];
         const b = data[i+2];
-        const avg = (r + g + b) / 3;
-        if (avg > 200) {
-          data[i+3] = Math.max(0, (255 - avg) * 2);
+        const a = data[i+3];
+        
+        // Relative luminance formula
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        
+        // Multi-stage threshold mask:
+        // - Luminance > 180: definitely paper background -> fully transparent.
+        // - Luminance between 110 and 180: smooth gradient luma-key to prevent edge pixelation.
+        // - Luminance < 110: crisp ink strokes -> boost contrast and enrich dark levels.
+        if (luminance > 180) {
+          data[i+3] = 0;
+        } else if (luminance > 110) {
+          const ratio = (180 - luminance) / (180 - 110);
+          data[i+3] = Math.round(a * Math.pow(ratio, 1.5));
+          
+          // Boost contrast slightly on anti-aliased edge pixels
+          data[i] = Math.max(0, Math.min(255, (r - 20) * 1.1));
+          data[i+1] = Math.max(0, Math.min(255, (g - 20) * 1.1));
+          data[i+2] = Math.max(0, Math.min(255, (b - 20) * 1.1));
+        } else {
+          // Substract white noise and stretch black level to solidify the ink strokes
+          data[i] = Math.max(0, Math.min(255, (r - 35) * 1.3));
+          data[i+1] = Math.max(0, Math.min(255, (g - 35) * 1.3));
+          data[i+2] = Math.max(0, Math.min(255, (b - 35) * 1.3));
         }
       }
       ctx.putImageData(imgData, 0, 0);
@@ -2869,4 +2994,27 @@ function initSwipeToCloseDrawers() {
     header.addEventListener('touchend', endHandler);
     header.addEventListener('touchcancel', endHandler);
   });
+}
+
+// Smart Snapping Alignment Guides
+function showAlignGuide(dir, offsetPixels, pageOverlay) {
+  let guide = pageOverlay.querySelector(`.pdf-align-guide-${dir}`);
+  if (!guide) {
+    guide = document.createElement('div');
+    guide.className = `pdf-align-guide-${dir}`;
+    pageOverlay.appendChild(guide);
+  }
+  guide.style.display = 'block';
+  if (dir === 'v') {
+    guide.style.left = offsetPixels + 'px';
+  } else {
+    guide.style.top = offsetPixels + 'px';
+  }
+}
+
+function hideAlignGuide(dir, pageOverlay) {
+  const guide = pageOverlay.querySelector(`.pdf-align-guide-${dir}`);
+  if (guide) {
+    guide.style.display = 'none';
+  }
 }

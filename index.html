@@ -43,7 +43,17 @@
         </div>
         <h1><span class="brand-name">PDF<span class="gradient-text">iller</span></span> <span class="mobile-badge">Mobile</span></h1>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" style="display: flex; gap: 6px; align-items: center;">
+        <button id="btn-undo-header" class="btn-circle btn-secondary" disabled title="Deshacer" style="width: 32px; height: 32px; font-size: 11px;">
+          <i class="fa-solid fa-arrow-rotate-left"></i>
+        </button>
+        <button id="btn-redo-header" class="btn-circle btn-secondary" disabled title="Rehacer" style="width: 32px; height: 32px; font-size: 11px;">
+          <i class="fa-solid fa-arrow-rotate-right"></i>
+        </button>
+        <button id="btn-delete-header" class="btn-circle btn-danger" disabled title="Eliminar seleccionado" style="width: 32px; height: 32px; font-size: 11px;">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+        <div style="width: 1px; height: 20px; background: var(--border-light); margin: 0 2px;"></div>
         <!-- Quick Action: Export / Download -->
         <button id="btn-save-final-quick" class="btn-circle btn-primary" title="Guardar PDF Como...">
           <i class="fa-solid fa-file-export"></i>
@@ -432,7 +442,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         // Use a cache-busting query to bypass aggressive HTTP cache for the registration script
-        navigator.serviceWorker.register('sw.js?v=4')
+        navigator.serviceWorker.register('sw.js?v=5')
           .then(reg => {
             console.log('Service Worker registrado correctamente.', reg.scope);
             
