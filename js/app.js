@@ -230,6 +230,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (pdfViewport) pdfViewport.style.display = 'none';
                 if (emptyState) emptyState.style.display = 'flex';
                 
+                // Activar clase no-document-loaded en el body
+                document.body.classList.add('no-document-loaded');
+                
                 // Deshabilitar botones de guardar
                 if (btnSaveDraft) btnSaveDraft.disabled = true;
                 if (btnSavePdf) btnSavePdf.disabled = true;
@@ -607,6 +610,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pdfViewport = document.getElementById('pdf-viewport');
             if (emptyState) emptyState.style.display = 'none';
             if (pdfViewport) pdfViewport.style.display = 'inline-block';
+            
+            // Remover clase no-document-loaded en el body
+            document.body.classList.remove('no-document-loaded');
 
             // Mostrar botón de descartar y habilitar botones de guardar
             const btnDiscard = document.getElementById('btn-discard');

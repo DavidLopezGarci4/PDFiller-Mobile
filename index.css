@@ -1601,4 +1601,34 @@ body.fill-mode-active .editable-field-wrapper.is-stamp.active-focus .editable-fi
     cursor: text !important;
 }
 
+/* ==========================================================================
+   INTERFAZ DE CARGA LIMPIA (OCULTAR TABS Y PAGINACIÓN EN ESTADO VACÍO)
+   ========================================================================== */
+
+/* Ocultar barra de herramientas y paginación si no hay documento cargado */
+body.no-document-loaded #app-toolbar,
+body.no-document-loaded #floating-pagination {
+    display: none !important;
+}
+
+body.no-document-loaded #workspace-container {
+    height: calc(100vh - 60px);
+    padding: 0;
+}
+
+/* Ocultar las bombillas de conflicto (💡), bordes de error y banners fuera del modo Editar */
+body:not(.edit-mode-active) .conflict-bulb {
+    display: none !important;
+}
+
+body:not(.edit-mode-active) .editable-field-wrapper.in-conflict {
+    border-color: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+body:not(.edit-mode-active) #conflict-banner {
+    display: none !important;
+}
+
 
