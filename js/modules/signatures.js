@@ -147,6 +147,7 @@ window.signaturesModule = (() => {
     btnClearSig.addEventListener('click', clearCanvas);
 
     canvas.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         isDrawing = true;
         const rect = canvas.getBoundingClientRect();
         lastX = e.clientX - rect.left;
@@ -158,6 +159,7 @@ window.signaturesModule = (() => {
 
     canvas.addEventListener('pointermove', (e) => {
         if (!isDrawing) return;
+        e.preventDefault();
         
         const rect = canvas.getBoundingClientRect();
         const currentX = e.clientX - rect.left;
@@ -170,8 +172,14 @@ window.signaturesModule = (() => {
         lastY = currentY;
     });
 
-    canvas.addEventListener('pointerup', () => { isDrawing = false; });
-    canvas.addEventListener('pointerout', () => { isDrawing = false; });
+    canvas.addEventListener('pointerup', (e) => { 
+        e.preventDefault();
+        isDrawing = false; 
+    });
+
+    canvas.addEventListener('pointercancel', () => { 
+        isDrawing = false; 
+    });
 
     btnSaveSig.addEventListener('click', () => {
         // Obtener el canvas de firma con fondo transparente
