@@ -230,7 +230,9 @@ window.signaturesModule = (() => {
         
         tempCtx.putImageData(imgData, 0, 0);
         return tempCanvas.toDataURL('image/png');
-        // --- 4. CARGA DE IMAGEN (JPG/PNG) CON ALGORITMO PREMIUM DE RECORTE Y ELIMINACIÓN DE FONDO ---
+    };
+
+    // --- 4. CARGA DE IMAGEN (JPG/PNG) CON ALGORITMO PREMIUM DE RECORTE Y ELIMINACIÓN DE FONDO ---
     
     // Inicializar controles interactivos del Cropper
     if (btnCropZoomIn) {
@@ -315,26 +317,27 @@ window.signaturesModule = (() => {
                         cropperInstance = null;
                     }
                     
-                    cropImg.src = event.target.result;
                     cropModal.classList.add('active');
-
-                    // Timeout para asegurar que el modal es visible y tiene dimensiones
-                    setTimeout(() => {
-                        cropperInstance = new Cropper(cropImg, {
-                            viewMode: 1,
-                            dragMode: 'move',
-                            autoCropArea: 0.85,
-                            restore: false,
-                            guides: true,
-                            center: true,
-                            highlight: false,
-                            cropBoxMovable: true,
-                            cropBoxResizable: true,
-                            toggleDragModeOnDblclick: false,
-                            background: true,
-                            modal: true
-                        });
-                    }, 150);
+                    cropImg.onload = () => {
+                        cropImg.onload = null; // Prevenir doble disparo
+                        setTimeout(() => {
+                            cropperInstance = new Cropper(cropImg, {
+                                viewMode: 1,
+                                dragMode: 'move',
+                                autoCropArea: 0.85,
+                                restore: false,
+                                guides: true,
+                                center: true,
+                                highlight: false,
+                                cropBoxMovable: true,
+                                cropBoxResizable: true,
+                                toggleDragModeOnDblclick: false,
+                                background: true,
+                                modal: true
+                            });
+                        }, 100);
+                    };
+                    cropImg.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             }
