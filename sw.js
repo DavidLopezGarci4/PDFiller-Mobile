@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdfiller2-cache-v2';
+const CACHE_NAME = 'pdfiller2-cache-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -20,7 +20,9 @@ const ASSETS_TO_CACHE = [
   'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
   'https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap'
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js'
 ];
 
 // Install Event

@@ -18,6 +18,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos Premium Personalizados -->
     <link rel="stylesheet" href="index.css?v=2.4">
+    <!-- Cropper.js para recorte interactivo de imágenes de firma -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <!-- PDF.js para renderizado de PDF en cliente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <!-- pdf-lib para guardar y compilar cambios en cliente -->
@@ -342,6 +345,45 @@
                 <div class="modal-footer">
                     <button id="btn-clear-sig" class="btn btn-secondary"><i class="fa-solid fa-trash"></i> Limpiar</button>
                     <button id="btn-save-sig" class="btn btn-primary"><i class="fa-solid fa-check"></i> Guardar Firma</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE RECORTE INTERACTIVO DE FIRMA -->
+        <div id="sig-crop-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Recortar Imagen de Firma</h2>
+                    <button class="modal-close" id="btn-close-crop-modal"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 12px; display: flex; flex-direction: column; align-items: center;">
+                    <p class="modal-info" style="align-self: flex-start; margin-bottom: 8px;">Ajusta el recuadro sobre tu firma. Puedes hacer zoom y mover la imagen.</p>
+                    
+                    <!-- Contenedor del Cropper -->
+                    <div class="crop-area-wrapper" style="width: 100%; height: 260px; background: #0b0f19; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;">
+                        <img id="sig-crop-image" style="max-width: 100%; max-height: 260px; display: block;">
+                    </div>
+                    
+                    <!-- Controles Rápidos del Cropper -->
+                    <div class="cropper-controls" style="display: flex; gap: 8px; margin-bottom: 14px; width: 100%;">
+                        <button id="btn-crop-zoom-in" type="button" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                        <button id="btn-crop-zoom-out" type="button" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                        <button id="btn-crop-rotate-left" type="button" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button id="btn-crop-rotate-right" type="button" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
+                    
+                    <!-- Opción de Quitar Fondo -->
+                    <div style="width: 100%; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 12px; color: var(--text-primary); font-weight: 500;">Extraer trazo de firma (sin fondo)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="crop-remove-bg" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-cancel-crop" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button id="btn-confirm-crop" class="btn btn-primary"><i class="fa-solid fa-check"></i> Importar Firma</button>
                 </div>
             </div>
         </div>

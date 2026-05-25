@@ -14,6 +14,20 @@ window.signaturesModule = (() => {
     const overlay = document.getElementById('pdf-overlay');
     const imgUpload = document.getElementById('sig-image-upload');
 
+    // Referencias a UI del Crop Modal (Móvil)
+    let cropperInstance = null;
+    const cropModal = document.getElementById('sig-crop-modal');
+    const cropImg = document.getElementById('sig-crop-image');
+    const btnCancelCrop = document.getElementById('btn-cancel-crop');
+    const btnConfirmCrop = document.getElementById('btn-confirm-crop');
+    const btnCloseCropModal = document.getElementById('btn-close-crop-modal');
+    const chkCropRemoveBg = document.getElementById('crop-remove-bg');
+    
+    const btnCropZoomIn = document.getElementById('btn-crop-zoom-in');
+    const btnCropZoomOut = document.getElementById('btn-crop-zoom-out');
+    const btnCropRotateLeft = document.getElementById('btn-crop-rotate-left');
+    const btnCropRotateRight = document.getElementById('btn-crop-rotate-right');
+
     // Contexto de Canvas para firma
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
@@ -216,42 +230,126 @@ window.signaturesModule = (() => {
         
         tempCtx.putImageData(imgData, 0, 0);
         return tempCanvas.toDataURL('image/png');
+        // --- 4. CARGA DE IMAGEN (JPG/PNG) CON ALGORITMO PREMIUM DE RECORTE Y ELIMINACIÓN DE FONDO ---
+    
+    // Inicializar controles interactivos del Cropper
+    if (btnCropZoomIn) {
+        btnCropZoomIn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (cropperInstance) cropperInstance.zoom(0.1);
+        });
+    }
+    if (btnCropZoomOut) {
+        btnCropZoomOut.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (cropperInstance) cropperInstance.zoom(-0.1);
+        });
+    }
+    if (btnCropRotateLeft) {
+        btnCropRotateLeft.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (cropperInstance) cropperInstance.rotate(-90);
+        });
+    }
+    if (btnCropRotateRight) {
+        btnCropRotateRight.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (cropperInstance) cropperInstance.rotate(90);
+        });
+    }
+
+    const closeCropFlow = () => {
+        cropModal.classList.remove('active');
+        if (cropperInstance) {
+            cropperInstance.destroy();
+            cropperInstance = null;
+        }
+        if (imgUpload) imgUpload.value = '';
     };
 
-    // --- 4. CARGA DE IMAGEN (JPG/PNG) CON ALGORITMO PREMIUM DE ELIMINACIÓN DE FONDO ---
+    if (btnCancelCrop) btnCancelCrop.addEventListener('click', (e) => { e.preventDefault(); closeCropFlow(); });
+    if (btnCloseCropModal) btnCloseCropModal.addEventListener('click', (e) => { e.preventDefault(); closeCropFlow(); });
+
+    if (btnConfirmCrop) {
+        btnConfirmCrop.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!cropperInstance) return;
+
+            // Obtener el canvas recortado a alta resolución
+            const croppedCanvas = cropperInstance.getCroppedCanvas({
+                maxWidth: 2048,
+                maxHeight: 2048,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high'
+            });
+
+            if (croppedCanvas) {
+                let processedDataUrl;
+                if (chkCropRemoveBg && chkCropRemoveBg.checked) {
+                    // Procesar usando el algoritmo premium de fondo
+                    processedDataUrl = extractSignatureFromImage(croppedCanvas);
+                } else {
+                    processedDataUrl = croppedCanvas.toDataURL('image/png');
+                }
+
+                savedSignatures.push(processedDataUrl);
+                localStorage.setItem('pdfiller_signatures', JSON.stringify(savedSignatures));
+                renderSignaturesList();
+                
+                // Cerrar todos los modals de firmas
+                closeCropFlow();
+                modal.classList.remove('active');
+            }
+        });
+    }
+
     if (imgUpload) {
         imgUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const processedDataUrl = extractSignatureFromImage(img, activeInkColor);
-                        savedSignatures.push(processedDataUrl);
-                        localStorage.setItem('pdfiller_signatures', JSON.stringify(savedSignatures));
-                        renderSignaturesList();
-                        modal.classList.remove('active');
-                        // Resetear uploader
-                        imgUpload.value = '';
-                    };
-                    img.src = event.target.result;
+                    // Inicializar Cropper.js
+                    if (cropperInstance) {
+                        cropperInstance.destroy();
+                        cropperInstance = null;
+                    }
+                    
+                    cropImg.src = event.target.result;
+                    cropModal.classList.add('active');
+
+                    // Timeout para asegurar que el modal es visible y tiene dimensiones
+                    setTimeout(() => {
+                        cropperInstance = new Cropper(cropImg, {
+                            viewMode: 1,
+                            dragMode: 'move',
+                            autoCropArea: 0.85,
+                            restore: false,
+                            guides: true,
+                            center: true,
+                            highlight: false,
+                            cropBoxMovable: true,
+                            cropBoxResizable: true,
+                            toggleDragModeOnDblclick: false,
+                            background: true,
+                            modal: true
+                        });
+                    }, 150);
                 };
                 reader.readAsDataURL(file);
             }
         });
     }
 
-    // Algoritmo Chroma Keying / Luminancia para remover fondos de firma escaneada
-    const extractSignatureFromImage = (img, strokeColor = '#0f172a') => {
+    // Algoritmo Premium de Aislamiento de Tinta (Anti-Cortes y Anti-Pérdida)
+    const extractSignatureFromImage = (imgSource) => {
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         
-        // Aumentar el tamaño máximo a 2048px para conservar la resolución, nitidez
-        // y el grosor original de los trazos finos a mano alzada.
+        // Aumentar el tamaño máximo a 2048px para conservar la resolución y nitidez.
         const maxDim = 2048;
-        let w = img.width;
-        let h = img.height;
+        let w = imgSource.width;
+        let h = imgSource.height;
         if (w > maxDim || h > maxDim) {
             if (w > h) {
                 h = Math.round((h * maxDim) / w);
@@ -264,42 +362,56 @@ window.signaturesModule = (() => {
         
         tempCanvas.width = w;
         tempCanvas.height = h;
-        tempCtx.drawImage(img, 0, 0, w, h);
+        tempCtx.drawImage(imgSource, 0, 0, w, h);
         
         const imgData = tempCtx.getImageData(0, 0, w, h);
         const data = imgData.data;
         
-        // 1. Estimar el color y la luminancia de fondo (papel) muestreando los bordes
+        // 1. Muestrear el color del papel (fondo) en los bordes perimetrales (5% exterior)
         let bgR = 0, bgG = 0, bgB = 0;
         let bgSampleCount = 0;
-        const stepSize = Math.max(1, Math.round(w / 40));
+        
+        const marginW = Math.max(1, Math.round(w * 0.05));
+        const marginH = Math.max(1, Math.round(h * 0.05));
+        const step = Math.max(1, Math.round(w / 60)); // Muestreo denso
         
         // Muestrear filas superior e inferior
-        for (let x = 0; x < w; x += stepSize) {
-            let idx = (0 * w + x) * 4;
-            bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
-            bgSampleCount++;
-            
-            idx = ((h - 1) * w + x) * 4;
-            bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
-            bgSampleCount++;
+        for (let x = 0; x < w; x += step) {
+            for (let y = 0; y < marginH; y++) {
+                const idx = (y * w + x) * 4;
+                bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
+                bgSampleCount++;
+            }
+            for (let y = h - marginH; y < h; y++) {
+                const idx = (y * w + x) * 4;
+                bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
+                bgSampleCount++;
+            }
         }
         // Muestrear columnas izquierda y derecha
-        for (let y = 0; y < h; y += stepSize) {
-            let idx = (y * w + 0) * 4;
-            bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
-            bgSampleCount++;
-            
-            idx = (y * w + (w - 1)) * 4;
-            bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
-            bgSampleCount++;
+        for (let y = marginH; y < h - marginH; y += step) {
+            for (let x = 0; x < marginW; x++) {
+                const idx = (y * w + x) * 4;
+                bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
+                bgSampleCount++;
+            }
+            for (let x = w - marginW; x < w; x++) {
+                const idx = (y * w + x) * 4;
+                bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
+                bgSampleCount++;
+            }
         }
         
-        bgR = Math.round(bgR / bgSampleCount);
-        bgG = Math.round(bgG / bgSampleCount);
-        bgB = Math.round(bgB / bgSampleCount);
+        if (bgSampleCount > 0) {
+            bgR = Math.round(bgR / bgSampleCount);
+            bgG = Math.round(bgG / bgSampleCount);
+            bgB = Math.round(bgB / bgSampleCount);
+        } else {
+            bgR = 255; bgG = 255; bgB = 255;
+        }
+        
         const bgLuminance = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
-        console.log(`[SignatureProcessor] Papel estimado: RGB(${bgR},${bgG},${bgB}), Lum: ${bgLuminance.toFixed(1)}`);
+        console.log(`[SignatureProcessor Premium] Papel estimado: RGB(${bgR},${bgG},${bgB}), Lum: ${bgLuminance.toFixed(1)}`);
         
         // 2. Extraer el trazo de tinta utilizando contraste adaptativo y desmezclado de color original
         for (let i = 0; i < data.length; i += 4) {
@@ -308,60 +420,52 @@ window.signaturesModule = (() => {
             const b = data[i+2];
             
             const l = 0.299 * r + 0.587 * g + 0.114 * b;
-            const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
             
+            const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
             // Relación de contraste respecto al papel de fondo
             const contrast = (bgLuminance - l) / Math.max(1, bgLuminance);
             
-            // Si tiene muy poco contraste cromático y lumínico, es papel de fondo
-            const isBackground = contrast < 0.06 && dist < 25;
+            let alpha = 0;
             
-            if (isBackground) {
-                data[i+3] = 0; // Transparencia absoluta para el papel puro
+            if (contrast < 0.03 && dist < 15) {
+                // Fondo puro -> transparente
+                alpha = 0;
+            } else if (contrast >= 0.18) {
+                // Tinta 100% saturada
+                alpha = 1.0;
             } else {
-                // Es trazo de firma
-                // Calcular intensidad del trazo (rampa suave de 0 a 1)
-                // Usamos un umbral de inicio más bajo (0.04 en lugar de 0.08) para preservar trazos súper finos y ligeros (lápiz, bolígrafos finos)
-                let strokeFactor = Math.min(1, Math.max(0, (contrast - 0.04) / 0.16));
-                if (dist > 25) {
-                    strokeFactor = Math.max(strokeFactor, Math.min(1, (dist - 15) / 25));
+                // Transición sigmoidal suave
+                const ratio = (contrast - 0.03) / 0.15;
+                // Exponente de realce gamma 0.85 para rescatar trazos finos
+                alpha = Math.pow(ratio, 0.85);
+            }
+            
+            if (alpha <= 0.001) {
+                data[i+3] = 0;
+            } else {
+                // Fórmula de desmezclado (Un-premultiplication) no destructiva
+                let strokeR = r;
+                let strokeG = g;
+                let strokeB = b;
+                
+                if (alpha < 1.0) {
+                    const rawR = (r - (1 - alpha) * bgR) / alpha;
+                    const rawG = (g - (1 - alpha) * bgG) / alpha;
+                    const rawB = (b - (1 - alpha) * bgB) / alpha;
+                    
+                    // Suavizado hacia el píxel original en alfas muy bajas para evitar ruido
+                    const blendOriginal = Math.max(0, Math.min(1, (0.25 - alpha) / 0.20));
+                    
+                    strokeR = rawR * (1 - blendOriginal) + r * blendOriginal;
+                    strokeG = rawG * (1 - blendOriginal) + g * blendOriginal;
+                    strokeB = rawB * (1 - blendOriginal) + b * blendOriginal;
                 }
                 
-                if (strokeFactor === 0) {
-                    data[i+3] = 0;
-                } else {
-                    // Mantener el color y textura original del bolígrafo/lápiz desmezclando el color del papel
-                    // para evitar el efecto de halo blanco al superponer en el PDF.
-                    // Fórmula de desmezclado (Un-premultiplication): P = alpha * I + (1 - alpha) * B => I = (P - (1 - alpha) * B) / alpha
-                    let strokeR = r;
-                    let strokeG = g;
-                    let strokeB = b;
-                    
-                    if (strokeFactor < 1.0 && strokeFactor > 0.05) {
-                        const rawR = (r - (1 - strokeFactor) * bgR) / strokeFactor;
-                        const rawG = (g - (1 - strokeFactor) * bgG) / strokeFactor;
-                        const rawB = (b - (1 - strokeFactor) * bgB) / strokeFactor;
-                        
-                        // Hacer un blend suave hacia el color original cuando strokeFactor es muy bajo
-                        // para evitar el ruido numérico en los bordes extremos del trazo.
-                        const blendOriginal = Math.max(0, Math.min(1, (0.2 - strokeFactor) / 0.15));
-                        
-                        strokeR = Math.round(rawR * (1 - blendOriginal) + r * blendOriginal);
-                        strokeG = Math.round(rawG * (1 - blendOriginal) + g * blendOriginal);
-                        strokeB = Math.round(rawB * (1 - blendOriginal) + b * blendOriginal);
-                    }
-                    
-                    // Clampear para evitar desbordamiento cromático
-                    strokeR = Math.max(0, Math.min(255, strokeR));
-                    strokeG = Math.max(0, Math.min(255, strokeG));
-                    strokeB = Math.max(0, Math.min(255, strokeB));
-                    
-                    data[i] = strokeR;
-                    data[i+1] = strokeG;
-                    data[i+2] = strokeB;
-                    // Opacidad proporcional al trazo
-                    data[i+3] = Math.round(strokeFactor * 255);
-                }
+                // Clampear valores cromáticos
+                data[i] = Math.max(0, Math.min(255, Math.round(strokeR)));
+                data[i+1] = Math.max(0, Math.min(255, Math.round(strokeG)));
+                data[i+2] = Math.max(0, Math.min(255, Math.round(strokeB)));
+                data[i+3] = Math.max(0, Math.min(255, Math.round(alpha * 255)));
             }
         }
         
