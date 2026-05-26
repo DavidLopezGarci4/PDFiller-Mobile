@@ -1282,10 +1282,17 @@ body:not(.edit-mode-active) .draggable-checkbox-wrapper {
     color: #ffffff !important;
 }
 
-/* Ocultar barra lateral en móviles */
+/* Ocultar barra lateral en móviles y reposicionar paginación flotante para evitar que se solape con la barra de herramientas inferior */
 @media (max-width: 680px) {
     .page-sidebar {
         display: none !important;
+    }
+
+    .floating-pagination {
+        bottom: auto !important;
+        top: 12px !important;
+        z-index: 95 !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     }
 }
 
